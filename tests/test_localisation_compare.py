@@ -80,11 +80,11 @@ class LocalisationComparatorTests(unittest.TestCase):
             )
             missing_russian = issues["MISSING_IN_RUSSIAN"]
             self.assertEqual(
-                english_root / "sample_l_english.yml",
+                (english_root / "sample_l_english.yml").resolve(),
                 missing_russian.english_path,
             )
             self.assertEqual(
-                russian_root / "sample_l_russian.yml",
+                (russian_root / "sample_l_russian.yml").resolve(),
                 missing_russian.russian_path,
             )
             self.assertEqual(3, missing_russian.russian_line)
@@ -94,12 +94,12 @@ class LocalisationComparatorTests(unittest.TestCase):
             )
             missing_english = issues["MISSING_IN_ENGLISH"]
             self.assertEqual(
-                english_root / "sample_l_english.yml",
+                (english_root / "sample_l_english.yml").resolve(),
                 missing_english.english_path,
             )
             self.assertEqual(3, missing_english.english_line)
             self.assertEqual(
-                russian_root / "sample_l_russian.yml",
+                (russian_root / "sample_l_russian.yml").resolve(),
                 missing_english.russian_path,
             )
             duplicate = issues["DUPLICATE_ENGLISH_KEY"]
