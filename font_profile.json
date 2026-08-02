@@ -1,0 +1,1272 @@
+{
+  "format_version": 1,
+  "name": "Equestria at War / Hearts of Iron IV UI fonts",
+  "default_language": "l_english",
+  "context_only_families": [
+    "tahoma_60"
+  ],
+  "languages": {
+    "l_english": {
+      "families": {
+        "Arial12": [
+          "base/Arial12.fnt"
+        ],
+        "cg_16b": [
+          "base/cg_16b.fnt",
+          "base/hoi_16tooltip3.fnt"
+        ],
+        "chat_input_font": [
+          "base/standard.fnt"
+        ],
+        "eaw_diplo_16mbs": [
+          "mod/eaw_diplo_16mbs.fnt"
+        ],
+        "fix_36header": [
+          "mod/hoi_36header.fnt"
+        ],
+        "garamond_14": [
+          "base/garamond_14.fnt"
+        ],
+        "hoi4_typewriter16": [
+          "base/hoi4_typewriter16.fnt",
+          "base/hoi_16typewriter.fnt"
+        ],
+        "hoi4_typewriter16_inverted": [
+          "base/hoi4_typewriter16_inverted.fnt",
+          "base/hoi_16typewriter_inverted.fnt"
+        ],
+        "hoi4_typewriter22": [
+          "base/hoi4_typewriter22.fnt",
+          "base/hoi_22typewriter.fnt"
+        ],
+        "hoi4_typewriter22_inverted": [
+          "base/hoi4_typewriter22_inverted.fnt",
+          "base/hoi_22typewriter_inverted.fnt"
+        ],
+        "hoi_16mbs": [
+          "base/hoi_16mbs.fnt",
+          "base/hoi_16mbs_cryllic.fnt"
+        ],
+        "hoi_18": [
+          "base/hoi_18.fnt",
+          "base/hoi_18_cryllic.fnt"
+        ],
+        "hoi_18b": [
+          "base/hoi_18.fnt",
+          "base/hoi_18_cryllic.fnt"
+        ],
+        "hoi_18mbs": [
+          "base/hoi_18mbs.fnt",
+          "base/hoi_18mbs_cryllic.fnt"
+        ],
+        "hoi_20b": [
+          "base/hoi_20b.fnt"
+        ],
+        "hoi_20bs": [
+          "base/hoi_20bs.fnt"
+        ],
+        "hoi_22chat": [
+          "base/hoi_22tech.fnt"
+        ],
+        "hoi_22tech": [
+          "base/hoi_22tech.fnt"
+        ],
+        "hoi_24header": [
+          "mod/hoi_24header.fnt"
+        ],
+        "hoi_30": [
+          "base/hoi_30.fnt"
+        ],
+        "hoi_30header": [
+          "base/hoi_30header.fnt",
+          "mod/hoi_30header_extras.fnt"
+        ],
+        "hoi_33": [
+          "base/hoi_33.fnt"
+        ],
+        "hoi_36header": [
+          "mod/hoi_36header.fnt"
+        ],
+        "loadscreen_header": [
+          "base/hoi_30header.fnt",
+          "mod/hoi_30header_extras.fnt"
+        ],
+        "loadscreen_tip": [
+          "mod/hoi_24header.fnt"
+        ],
+        "Main_14": [
+          "base/garamond_14.fnt"
+        ],
+        "Main_14_black": [
+          "base/garamond_14_bold.fnt"
+        ],
+        "Main_14_bold": [
+          "base/garamond_14_bold.fnt"
+        ],
+        "Main_14_eu": [
+          "base/garamond_14.fnt"
+        ],
+        "Main_14_grey": [
+          "base/garamond_14.fnt"
+        ],
+        "Main_16": [
+          "base/garamond_16_bold.fnt"
+        ],
+        "standard_font": [
+          "base/standard.fnt"
+        ],
+        "ToolTip_Font": [
+          "base/garamond_16.fnt"
+        ],
+        "vic_18": [
+          "base/vic_18.fnt"
+        ],
+        "vic_22": [
+          "base/vic_22.fnt"
+        ],
+        "tahoma_60": [
+          "base/hoi_mapfont4.fnt"
+        ]
+      }
+    },
+    "l_braz_por": {
+      "families": {
+        "Arial12": [
+          "base/Arial12.fnt"
+        ],
+        "cg_16b": [
+          "base/cg_16b.fnt",
+          "base/hoi_16tooltip3.fnt"
+        ],
+        "chat_input_font": [
+          "base/standard.fnt"
+        ],
+        "eaw_diplo_16mbs": [
+          "mod/eaw_diplo_16mbs.fnt"
+        ],
+        "fix_36header": [
+          "mod/hoi_36header.fnt"
+        ],
+        "garamond_14": [
+          "base/garamond_14.fnt"
+        ],
+        "hoi4_typewriter16": [
+          "base/hoi4_typewriter16.fnt",
+          "base/hoi_16typewriter.fnt"
+        ],
+        "hoi4_typewriter16_inverted": [
+          "base/hoi4_typewriter16_inverted.fnt",
+          "base/hoi_16typewriter_inverted.fnt"
+        ],
+        "hoi4_typewriter22": [
+          "base/hoi4_typewriter22.fnt",
+          "base/hoi_22typewriter.fnt"
+        ],
+        "hoi4_typewriter22_inverted": [
+          "base/hoi4_typewriter22_inverted.fnt",
+          "base/hoi_22typewriter_inverted.fnt"
+        ],
+        "hoi_16mbs": [
+          "base/hoi_16mbs.fnt",
+          "base/hoi_16mbs_cryllic.fnt"
+        ],
+        "hoi_18": [
+          "base/hoi_18.fnt",
+          "base/hoi_18_cryllic.fnt"
+        ],
+        "hoi_18b": [
+          "base/hoi_18.fnt",
+          "base/hoi_18_cryllic.fnt"
+        ],
+        "hoi_18mbs": [
+          "base/hoi_18mbs.fnt",
+          "base/hoi_18mbs_cryllic.fnt"
+        ],
+        "hoi_20b": [
+          "base/hoi_20b.fnt"
+        ],
+        "hoi_20bs": [
+          "base/hoi_20bs.fnt"
+        ],
+        "hoi_22chat": [
+          "base/hoi_22tech.fnt"
+        ],
+        "hoi_22tech": [
+          "base/hoi_22tech.fnt"
+        ],
+        "hoi_24header": [
+          "mod/hoi_24header.fnt"
+        ],
+        "hoi_30": [
+          "base/hoi_30.fnt"
+        ],
+        "hoi_30header": [
+          "base/hoi_30header.fnt",
+          "mod/hoi_30header_extras.fnt"
+        ],
+        "hoi_33": [
+          "base/hoi_33.fnt"
+        ],
+        "hoi_36header": [
+          "mod/hoi_36header.fnt"
+        ],
+        "loadscreen_header": [
+          "base/hoi_30header.fnt",
+          "mod/hoi_30header_extras.fnt"
+        ],
+        "loadscreen_tip": [
+          "mod/hoi_24header.fnt"
+        ],
+        "Main_14": [
+          "base/garamond_14.fnt"
+        ],
+        "Main_14_black": [
+          "base/garamond_14_bold.fnt"
+        ],
+        "Main_14_bold": [
+          "base/garamond_14_bold.fnt"
+        ],
+        "Main_14_eu": [
+          "base/garamond_14.fnt"
+        ],
+        "Main_14_grey": [
+          "base/garamond_14.fnt"
+        ],
+        "Main_16": [
+          "base/garamond_16_bold.fnt"
+        ],
+        "standard_font": [
+          "base/standard.fnt"
+        ],
+        "ToolTip_Font": [
+          "base/garamond_16.fnt"
+        ],
+        "vic_18": [
+          "base/vic_18.fnt"
+        ],
+        "vic_22": [
+          "base/vic_22.fnt"
+        ],
+        "tahoma_60": [
+          "base/hoi_mapfont4.fnt"
+        ]
+      }
+    },
+    "l_french": {
+      "families": {
+        "Arial12": [
+          "base/Arial12.fnt"
+        ],
+        "cg_16b": [
+          "base/cg_16b.fnt",
+          "base/hoi_16tooltip3.fnt"
+        ],
+        "eaw_diplo_16mbs": [
+          "mod/eaw_diplo_16mbs.fnt"
+        ],
+        "fix_36header": [
+          "mod/hoi_36header.fnt"
+        ],
+        "hoi4_typewriter16": [
+          "base/hoi4_typewriter16.fnt",
+          "base/hoi_16typewriter.fnt"
+        ],
+        "hoi4_typewriter16_inverted": [
+          "base/hoi4_typewriter16_inverted.fnt",
+          "base/hoi_16typewriter_inverted.fnt"
+        ],
+        "hoi4_typewriter22": [
+          "base/hoi4_typewriter22.fnt",
+          "base/hoi_22typewriter.fnt"
+        ],
+        "hoi4_typewriter22_inverted": [
+          "base/hoi4_typewriter22_inverted.fnt",
+          "base/hoi_22typewriter_inverted.fnt"
+        ],
+        "hoi_16mbs": [
+          "base/hoi_16mbs.fnt",
+          "base/hoi_16mbs_cryllic.fnt"
+        ],
+        "hoi_18": [
+          "base/hoi_18.fnt",
+          "base/hoi_18_cryllic.fnt"
+        ],
+        "hoi_18b": [
+          "base/hoi_18.fnt",
+          "base/hoi_18_cryllic.fnt"
+        ],
+        "hoi_18mbs": [
+          "base/hoi_18mbs.fnt",
+          "base/hoi_18mbs_cryllic.fnt"
+        ],
+        "hoi_20b": [
+          "base/hoi_20b.fnt"
+        ],
+        "hoi_20bs": [
+          "base/hoi_20bs.fnt"
+        ],
+        "hoi_22chat": [
+          "base/hoi_22tech.fnt"
+        ],
+        "hoi_22tech": [
+          "base/hoi_22tech.fnt"
+        ],
+        "hoi_24header": [
+          "mod/hoi_24header.fnt"
+        ],
+        "hoi_30": [
+          "base/hoi_30.fnt"
+        ],
+        "hoi_33": [
+          "base/hoi_33.fnt"
+        ],
+        "hoi_36header": [
+          "mod/hoi_36header.fnt"
+        ],
+        "loadscreen_tip": [
+          "mod/hoi_24header.fnt"
+        ],
+        "tahoma_60": [
+          "base/hoi_mapfont4.fnt"
+        ]
+      }
+    },
+    "l_german": {
+      "families": {
+        "Arial12": [
+          "base/Arial12.fnt"
+        ],
+        "cg_16b": [
+          "base/cg_16b.fnt",
+          "base/hoi_16tooltip3.fnt"
+        ],
+        "chat_input_font": [
+          "base/standard.fnt"
+        ],
+        "eaw_diplo_16mbs": [
+          "mod/eaw_diplo_16mbs.fnt"
+        ],
+        "fix_36header": [
+          "mod/hoi_36header.fnt"
+        ],
+        "garamond_14": [
+          "base/garamond_14.fnt"
+        ],
+        "hoi4_typewriter16": [
+          "base/hoi4_typewriter16.fnt",
+          "base/hoi_16typewriter.fnt"
+        ],
+        "hoi4_typewriter16_inverted": [
+          "base/hoi4_typewriter16_inverted.fnt",
+          "base/hoi_16typewriter_inverted.fnt"
+        ],
+        "hoi4_typewriter22": [
+          "base/hoi4_typewriter22.fnt",
+          "base/hoi_22typewriter.fnt"
+        ],
+        "hoi4_typewriter22_inverted": [
+          "base/hoi4_typewriter22_inverted.fnt",
+          "base/hoi_22typewriter_inverted.fnt"
+        ],
+        "hoi_16mbs": [
+          "base/hoi_16mbs.fnt",
+          "base/hoi_16mbs_cryllic.fnt"
+        ],
+        "hoi_18": [
+          "base/hoi_18.fnt",
+          "base/hoi_18_cryllic.fnt"
+        ],
+        "hoi_18b": [
+          "base/hoi_18.fnt",
+          "base/hoi_18_cryllic.fnt"
+        ],
+        "hoi_18mbs": [
+          "base/hoi_18mbs.fnt",
+          "base/hoi_18mbs_cryllic.fnt"
+        ],
+        "hoi_20b": [
+          "base/hoi_20b.fnt"
+        ],
+        "hoi_20bs": [
+          "base/hoi_20bs.fnt"
+        ],
+        "hoi_22chat": [
+          "base/hoi_22tech.fnt"
+        ],
+        "hoi_22tech": [
+          "base/hoi_22tech.fnt"
+        ],
+        "hoi_24header": [
+          "mod/hoi_24header.fnt"
+        ],
+        "hoi_30": [
+          "base/hoi_30.fnt"
+        ],
+        "hoi_30header": [
+          "base/hoi_30header.fnt",
+          "mod/hoi_30header_extras.fnt"
+        ],
+        "hoi_33": [
+          "base/hoi_33.fnt"
+        ],
+        "hoi_36header": [
+          "mod/hoi_36header.fnt"
+        ],
+        "loadscreen_header": [
+          "base/hoi_30header.fnt",
+          "mod/hoi_30header_extras.fnt"
+        ],
+        "loadscreen_tip": [
+          "mod/hoi_24header.fnt"
+        ],
+        "Main_14": [
+          "base/garamond_14.fnt"
+        ],
+        "Main_14_black": [
+          "base/garamond_14_bold.fnt"
+        ],
+        "Main_14_bold": [
+          "base/garamond_14_bold.fnt"
+        ],
+        "Main_14_eu": [
+          "base/garamond_14.fnt"
+        ],
+        "Main_14_grey": [
+          "base/garamond_14.fnt"
+        ],
+        "Main_16": [
+          "base/garamond_16_bold.fnt"
+        ],
+        "standard_font": [
+          "base/standard.fnt"
+        ],
+        "ToolTip_Font": [
+          "base/garamond_16.fnt"
+        ],
+        "vic_18": [
+          "base/vic_18.fnt"
+        ],
+        "vic_22": [
+          "base/vic_22.fnt"
+        ],
+        "tahoma_60": [
+          "base/hoi_mapfont4.fnt"
+        ]
+      }
+    },
+    "l_japanese": {
+      "families": {
+        "Arial12": [
+          "base/japanese/Arial12.fnt"
+        ],
+        "cg_16b": [
+          "base/japanese/cg_16b.fnt"
+        ],
+        "garamond_14": [
+          "base/japanese/garamond_14.fnt"
+        ],
+        "hoi4_typewriter16": [
+          "base/japanese/hoi4_typewriter16.fnt"
+        ],
+        "hoi4_typewriter16_inverted": [
+          "base/japanese/hoi4_typewriter16_inverted.fnt"
+        ],
+        "hoi4_typewriter22": [
+          "base/japanese/hoi4_typewriter22.fnt"
+        ],
+        "hoi4_typewriter22_inverted": [
+          "base/japanese/hoi4_typewriter22_inverted.fnt"
+        ],
+        "hoi_16mbs": [
+          "base/japanese/hoi_16mbs.fnt"
+        ],
+        "hoi_18": [
+          "base/japanese/hoi_18.fnt"
+        ],
+        "hoi_18b": [
+          "base/japanese/hoi_18b.fnt"
+        ],
+        "hoi_18mbs": [
+          "base/japanese/hoi_18mbs.fnt"
+        ],
+        "hoi_20b": [
+          "base/japanese/hoi_20b.fnt"
+        ],
+        "hoi_20bs": [
+          "base/japanese/hoi_20bs.fnt"
+        ],
+        "hoi_22chat": [
+          "base/japanese/hoi_22tech.fnt"
+        ],
+        "hoi_22tech": [
+          "base/japanese/hoi_22tech.fnt"
+        ],
+        "hoi_24header": [
+          "base/japanese/hoi_24header.fnt"
+        ],
+        "hoi_30": [
+          "base/japanese/hoi_30.fnt"
+        ],
+        "hoi_30header": [
+          "base/japanese/hoi_30header.fnt"
+        ],
+        "hoi_33": [
+          "base/japanese/hoi_33.fnt"
+        ],
+        "hoi_36header": [
+          "base/japanese/hoi_36header.fnt"
+        ],
+        "loadscreen_header": [
+          "base/japanese/hoi_30header.fnt"
+        ],
+        "loadscreen_tip": [
+          "base/japanese/hoi_24header.fnt"
+        ],
+        "Main_14": [
+          "base/japanese/garamond_14.fnt"
+        ],
+        "Main_14_black": [
+          "base/japanese/garamond_14_bold.fnt"
+        ],
+        "Main_14_bold": [
+          "base/japanese/garamond_14_bold.fnt"
+        ],
+        "Main_14_eu": [
+          "base/japanese/garamond_14.fnt"
+        ],
+        "Main_14_grey": [
+          "base/japanese/garamond_14.fnt"
+        ],
+        "Main_16": [
+          "base/japanese/garamond_16_bold.fnt"
+        ],
+        "ToolTip_Font": [
+          "base/japanese/garamond_16.fnt"
+        ],
+        "vic_18": [
+          "base/japanese/vic_18.fnt"
+        ],
+        "vic_22": [
+          "base/japanese/vic_22.fnt"
+        ],
+        "tahoma_60": [
+          "base/japanese/hoi_mapfont4_0.fnt",
+          "base/japanese/hoi_mapfont4_1.fnt"
+        ]
+      }
+    },
+    "l_korean": {
+      "families": {
+        "Arial12": [
+          "base/korean/Arial12.fnt"
+        ],
+        "cg_16b": [
+          "base/korean/cg_18b.fnt"
+        ],
+        "chat_input_font": [
+          "base/korean/hoi_16mbs.fnt"
+        ],
+        "fix_36header": [
+          "base/korean/hoi_36header.fnt"
+        ],
+        "garamond_14": [
+          "base/korean/garamond_14.fnt"
+        ],
+        "hoi4_typewriter16": [
+          "base/korean/hoi_16typewriter.fnt"
+        ],
+        "hoi4_typewriter16_inverted": [
+          "base/korean/hoi4_typewriter16_inverted.fnt"
+        ],
+        "hoi4_typewriter22": [
+          "base/korean/hoi4_typewriter22.fnt"
+        ],
+        "hoi4_typewriter22_inverted": [
+          "base/korean/hoi4_typewriter22.fnt"
+        ],
+        "hoi_16mbs": [
+          "base/korean/hoi_16mbs.fnt"
+        ],
+        "hoi_18": [
+          "base/korean/hoi_18.fnt"
+        ],
+        "hoi_18b": [
+          "base/korean/hoi_18.fnt"
+        ],
+        "hoi_18mbs": [
+          "base/korean/hoi_18mbs.fnt"
+        ],
+        "hoi_20b": [
+          "base/korean/hoi_20b.fnt"
+        ],
+        "hoi_20bs": [
+          "base/korean/hoi_20bs.fnt"
+        ],
+        "hoi_22chat": [
+          "base/korean/hoi_22tech.fnt"
+        ],
+        "hoi_22tech": [
+          "base/korean/hoi_22tech.fnt"
+        ],
+        "hoi_24header": [
+          "base/korean/hoi_24header.fnt"
+        ],
+        "hoi_30": [
+          "base/korean/hoi_30.fnt"
+        ],
+        "hoi_30header": [
+          "base/korean/hoi_30header.fnt"
+        ],
+        "hoi_33": [
+          "base/korean/hoi_33.fnt"
+        ],
+        "hoi_36header": [
+          "base/korean/hoi_36header.fnt"
+        ],
+        "Main_14": [
+          "base/korean/garamond_14.fnt"
+        ],
+        "Main_14_black": [
+          "base/korean/garamond_14_bold.fnt"
+        ],
+        "Main_14_bold": [
+          "base/korean/garamond_14_bold.fnt"
+        ],
+        "Main_14_eu": [
+          "base/korean/garamond_14.fnt"
+        ],
+        "Main_14_grey": [
+          "base/korean/garamond_14.fnt"
+        ],
+        "Main_16": [
+          "base/korean/garamond_16_bold.fnt"
+        ],
+        "standard_font": [
+          "base/korean/hoi_16mbs.fnt"
+        ],
+        "ToolTip_Font": [
+          "base/korean/garamond_16.fnt"
+        ],
+        "vic_18": [
+          "base/korean/vic_18.fnt"
+        ],
+        "vic_22": [
+          "base/korean/vic_22.fnt"
+        ],
+        "tahoma_60": [
+          "base/korean/hoi_mapfont4.fnt"
+        ]
+      }
+    },
+    "l_polish": {
+      "families": {
+        "Arial12": [
+          "base/Arial12.fnt"
+        ],
+        "cg_16b": [
+          "base/hoi_16tooltip3.fnt"
+        ],
+        "eaw_diplo_16mbs": [
+          "mod/eaw_diplo_16mbs.fnt"
+        ],
+        "hoi4_typewriter16": [
+          "base/hoi_16typewriter.fnt",
+          "base/hoi_16typewriter_cryllic.fnt"
+        ],
+        "hoi4_typewriter16_inverted": [
+          "base/hoi_16typewriter_inverted.fnt",
+          "base/hoi_16typewriter_cryllic_inverted.fnt"
+        ],
+        "hoi4_typewriter22": [
+          "base/hoi_22typewriter.fnt",
+          "base/hoi_22typewriter_cryllic.fnt"
+        ],
+        "hoi4_typewriter22_inverted": [
+          "base/hoi_22typewriter_inverted.fnt",
+          "base/hoi_22typewriter_cryllic_inverted.fnt"
+        ],
+        "hoi_16mbs": [
+          "base/hoi_16mbs.fnt",
+          "base/hoi_16mbs_cryllic.fnt"
+        ],
+        "hoi_18": [
+          "base/hoi_18.fnt",
+          "base/hoi_18_cryllic.fnt"
+        ],
+        "hoi_18b": [
+          "base/hoi_18.fnt",
+          "base/hoi_18_cryllic.fnt"
+        ],
+        "hoi_18mbs": [
+          "base/hoi_18mbs.fnt",
+          "base/hoi_18mbs_cryllic.fnt"
+        ],
+        "hoi_20b": [
+          "base/hoi_20b.fnt",
+          "base/hoi_20b_cryllic.fnt"
+        ],
+        "hoi_20bs": [
+          "base/hoi_20bs.fnt",
+          "base/hoi_20bs_cryllic.fnt"
+        ],
+        "hoi_22chat": [
+          "base/hoi_22tech.fnt"
+        ],
+        "hoi_22tech": [
+          "base/hoi_22tech.fnt"
+        ],
+        "hoi_24header": [
+          "base/hoi_20bs.fnt",
+          "base/hoi_20bs_cryllic.fnt"
+        ],
+        "hoi_30": [
+          "base/hoi_30.fnt",
+          "base/hoi_30_cyrillic.fnt"
+        ],
+        "hoi_30header": [
+          "base/hoi_20bs.fnt",
+          "base/hoi_20bs_cryllic.fnt"
+        ],
+        "hoi_33": [
+          "base/hoi_33.fnt"
+        ],
+        "hoi_36header": [
+          "base/hoi_26mbs.fnt",
+          "base/hoi_26mbs_cryllic.fnt"
+        ],
+        "loadscreen_header": [
+          "base/hoi_20bs.fnt",
+          "base/hoi_20bs_cryllic.fnt"
+        ],
+        "loadscreen_tip": [
+          "base/hoi_20bs.fnt",
+          "base/hoi_20bs_cryllic.fnt"
+        ],
+        "vic_18": [
+          "base/hoi_18.fnt",
+          "base/hoi_18_cryllic.fnt"
+        ],
+        "vic_22": [
+          "base/hoi_18.fnt",
+          "base/hoi_18_cryllic.fnt"
+        ],
+        "tahoma_60": [
+          "base/hoi_mapfont4.fnt"
+        ]
+      }
+    },
+    "l_russian": {
+      "families": {
+        "cg_16b": [
+          "base/hoi_16tooltip3.fnt"
+        ],
+        "eaw_diplo_16mbs": [
+          "mod/eaw_diplo_16mbs.fnt",
+          "mod/eaw_diplo_16mbs_cryllic.fnt"
+        ],
+        "fix_36header": [
+          "base/hoi_30header.fnt",
+          "mod/eaw_30header_cryllic.fnt",
+          "mod/hoi_30header_extras.fnt"
+        ],
+        "hoi4_typewriter16": [
+          "base/hoi_16typewriter.fnt",
+          "base/hoi_16typewriter_cryllic.fnt"
+        ],
+        "hoi4_typewriter16_inverted": [
+          "base/hoi_16typewriter_inverted.fnt",
+          "base/hoi_16typewriter_cryllic_inverted.fnt"
+        ],
+        "hoi4_typewriter22": [
+          "base/hoi_22typewriter.fnt",
+          "base/hoi_22typewriter_cryllic.fnt"
+        ],
+        "hoi4_typewriter22_inverted": [
+          "base/hoi_22typewriter_inverted.fnt",
+          "base/hoi_22typewriter_cryllic_inverted.fnt"
+        ],
+        "hoi_16mbs": [
+          "base/hoi_16mbs.fnt",
+          "base/hoi_16mbs_cryllic.fnt"
+        ],
+        "hoi_18": [
+          "base/hoi_18.fnt",
+          "base/hoi_18_cryllic.fnt"
+        ],
+        "hoi_18b": [
+          "base/hoi_18.fnt",
+          "base/hoi_18_cryllic.fnt"
+        ],
+        "hoi_18mbs": [
+          "base/hoi_18mbs.fnt",
+          "base/hoi_18mbs_cryllic.fnt"
+        ],
+        "hoi_20b": [
+          "base/hoi_20b.fnt",
+          "base/hoi_20b_cryllic.fnt"
+        ],
+        "hoi_20bs": [
+          "base/hoi_20bs.fnt",
+          "base/hoi_20bs_cryllic.fnt"
+        ],
+        "hoi_22chat": [
+          "base/hoi_22tech.fnt"
+        ],
+        "hoi_22tech": [
+          "base/hoi_22tech.fnt"
+        ],
+        "hoi_24header": [
+          "mod/hoi_24header.fnt",
+          "mod/eaw_24header_cryllic.fnt"
+        ],
+        "hoi_30": [
+          "base/hoi_30.fnt",
+          "base/hoi_30_cyrillic.fnt"
+        ],
+        "hoi_30header": [
+          "base/hoi_30header.fnt",
+          "mod/hoi_30header_extras.fnt",
+          "mod/eaw_30header_cryllic.fnt"
+        ],
+        "hoi_33": [
+          "base/hoi_33.fnt"
+        ],
+        "hoi_36header": [
+          "mod/hoi_36header.fnt",
+          "mod/eaw_36header_cryllic.fnt"
+        ],
+        "loadscreen_header": [
+          "base/hoi_30header.fnt",
+          "mod/hoi_30header_extras.fnt",
+          "mod/eaw_30header_cryllic.fnt"
+        ],
+        "loadscreen_tip": [
+          "mod/hoi_24header.fnt",
+          "mod/eaw_24header_cryllic.fnt"
+        ],
+        "vic_18": [
+          "base/hoi_18.fnt",
+          "base/hoi_18_cryllic.fnt"
+        ],
+        "vic_22": [
+          "base/hoi_18.fnt",
+          "base/hoi_18_cryllic.fnt"
+        ],
+        "tahoma_60": [
+          "base/hoi_mapfont4.fnt"
+        ]
+      }
+    },
+    "l_simp_chinese": {
+      "families": {
+        "Arial12": [
+          "base/chinese/Arial12_1of4.fnt",
+          "base/chinese/Arial12_2of4.fnt",
+          "base/chinese/Arial12_3of4.fnt",
+          "base/chinese/Arial12_4of4.fnt"
+        ],
+        "cg_16b": [
+          "base/chinese/cg_18b_1of4EX.fnt",
+          "base/chinese/cg_18b_2of4EX.fnt",
+          "base/chinese/cg_18b_3of4EX.fnt",
+          "base/chinese/cg_18b_4of4EX.fnt"
+        ],
+        "chat_input_font": [
+          "base/chinese/standard_1of4.fnt",
+          "base/chinese/standard_2of4.fnt",
+          "base/chinese/standard_3of4.fnt",
+          "base/chinese/standard_4of4.fnt"
+        ],
+        "eaw_diplo_16mbs": [
+          "mod/eaw_diplo_16mbs.fnt",
+          "mod/eaw_diplo_16mbs_cryllic.fnt",
+          "mod/eaw_16mbs_1of4.fnt",
+          "mod/eaw_16mbs_2of4.fnt",
+          "mod/eaw_16mbs_3of4.fnt",
+          "mod/eaw_16mbs_4of4.fnt",
+          "mod/eaw_16mbs_1of4EX.fnt",
+          "mod/eaw_16mbs_2of4EX.fnt",
+          "mod/eaw_16mbs_3of4EX.fnt",
+          "mod/eaw_16mbs_4of4EX.fnt"
+        ],
+        "fix_36header": [
+          "base/chinese/hoi_36header_1of4.fnt",
+          "base/chinese/hoi_36header_2of4.fnt",
+          "base/chinese/hoi_36header_3of4.fnt",
+          "base/chinese/hoi_36header_4of4.fnt"
+        ],
+        "hoi4_typewriter16": [
+          "base/chinese/hoi_16typewriter_1of4EX.fnt",
+          "base/chinese/hoi_16typewriter_2of4EX.fnt",
+          "base/chinese/hoi_16typewriter_3of4EX.fnt",
+          "base/chinese/hoi_16typewriter_4of4EX.fnt"
+        ],
+        "hoi4_typewriter16_inverted": [
+          "base/chinese/hoi4_typewriter16_inverted_1of4.fnt",
+          "base/chinese/hoi4_typewriter16_inverted_2of4.fnt",
+          "base/chinese/hoi4_typewriter16_inverted_3of4.fnt",
+          "base/chinese/hoi4_typewriter16_inverted_4of4.fnt"
+        ],
+        "hoi4_typewriter22": [
+          "base/chinese/hoi4_typewriter22_1of4.fnt",
+          "base/chinese/hoi4_typewriter22_2of4.fnt",
+          "base/chinese/hoi4_typewriter22_3of4.fnt",
+          "base/chinese/hoi4_typewriter22_4of4.fnt"
+        ],
+        "hoi4_typewriter22_inverted": [
+          "base/chinese/hoi4_typewriter22_inverted_1of4.fnt",
+          "base/chinese/hoi4_typewriter22_inverted_2of4.fnt",
+          "base/chinese/hoi4_typewriter22_inverted_3of4.fnt",
+          "base/chinese/hoi4_typewriter22_inverted_4of4.fnt"
+        ],
+        "hoi_16mbs": [
+          "base/chinese/hoi_16mbs_1of4EX.fnt",
+          "base/chinese/hoi_16mbs_2of4EX.fnt",
+          "base/chinese/hoi_16mbs_3of4EX.fnt",
+          "base/chinese/hoi_16mbs_4of4EX.fnt"
+        ],
+        "hoi_18": [
+          "base/chinese/hoi_18_1of4.fnt",
+          "base/chinese/hoi_18_2of4.fnt",
+          "base/chinese/hoi_18_3of4.fnt",
+          "base/chinese/hoi_18_4of4.fnt"
+        ],
+        "hoi_18b": [
+          "base/chinese/hoi_18_1of4.fnt",
+          "base/chinese/hoi_18_2of4.fnt",
+          "base/chinese/hoi_18_3of4.fnt",
+          "base/chinese/hoi_18_4of4.fnt"
+        ],
+        "hoi_18mbs": [
+          "base/chinese/hoi_18mbs_1of4EX.fnt",
+          "base/chinese/hoi_18mbs_2of4EX.fnt",
+          "base/chinese/hoi_18mbs_3of4EX.fnt",
+          "base/chinese/hoi_18mbs_4of4EX.fnt"
+        ],
+        "hoi_20b": [
+          "base/chinese/hoi_20b_1of4EX.fnt",
+          "base/chinese/hoi_20b_2of4EX.fnt",
+          "base/chinese/hoi_20b_3of4EX.fnt",
+          "base/chinese/hoi_20b_4of4EX.fnt"
+        ],
+        "hoi_20bs": [
+          "base/chinese/hoi_20bs_1of4EX.fnt",
+          "base/chinese/hoi_20bs_2of4EX.fnt",
+          "base/chinese/hoi_20bs_3of4EX.fnt",
+          "base/chinese/hoi_20bs_4of4EX.fnt"
+        ],
+        "hoi_22chat": [
+          "base/chinese/hoi_22tech_1of4.fnt",
+          "base/chinese/hoi_22tech_2of4.fnt",
+          "base/chinese/hoi_22tech_3of4.fnt",
+          "base/chinese/hoi_22tech_4of4.fnt"
+        ],
+        "hoi_22tech": [
+          "base/chinese/hoi_22tech_1of4.fnt",
+          "base/chinese/hoi_22tech_2of4.fnt",
+          "base/chinese/hoi_22tech_3of4.fnt",
+          "base/chinese/hoi_22tech_4of4.fnt"
+        ],
+        "hoi_24header": [
+          "base/chinese/hoi_24header_1of4.fnt",
+          "base/chinese/hoi_24header_2of4.fnt",
+          "base/chinese/hoi_24header_3of4.fnt",
+          "base/chinese/hoi_24header_4of4.fnt"
+        ],
+        "hoi_30": [
+          "base/chinese/hoi_30_1of4.fnt",
+          "base/chinese/hoi_30_2of4.fnt",
+          "base/chinese/hoi_30_3of4.fnt",
+          "base/chinese/hoi_30_4of4.fnt"
+        ],
+        "hoi_30header": [
+          "base/chinese/hoi_30header_1of4.fnt",
+          "base/chinese/hoi_30header_2of4.fnt",
+          "base/chinese/hoi_30header_3of4.fnt",
+          "base/chinese/hoi_30header_4of4.fnt"
+        ],
+        "hoi_33": [
+          "base/chinese/hoi_33_1of4.fnt",
+          "base/chinese/hoi_33_2of4.fnt",
+          "base/chinese/hoi_33_3of4.fnt",
+          "base/chinese/hoi_33_4of4.fnt"
+        ],
+        "hoi_36header": [
+          "base/chinese/hoi_36header_1of4.fnt",
+          "base/chinese/hoi_36header_2of4.fnt",
+          "base/chinese/hoi_36header_3of4.fnt",
+          "base/chinese/hoi_36header_4of4.fnt"
+        ],
+        "loadscreen_header": [
+          "base/chinese/hoi_30header_1of4.fnt",
+          "base/chinese/hoi_30header_2of4.fnt",
+          "base/chinese/hoi_30header_3of4.fnt",
+          "base/chinese/hoi_30header_4of4.fnt"
+        ],
+        "loadscreen_tip": [
+          "base/chinese/hoi_24header_1of4.fnt",
+          "base/chinese/hoi_24header_2of4.fnt",
+          "base/chinese/hoi_24header_3of4.fnt",
+          "base/chinese/hoi_24header_4of4.fnt"
+        ],
+        "Main_14_black": [
+          "base/chinese/garamond_14_bold_1of4.fnt",
+          "base/chinese/garamond_14_bold_2of4.fnt",
+          "base/chinese/garamond_14_bold_3of4.fnt",
+          "base/chinese/garamond_14_bold_4of4.fnt"
+        ],
+        "Main_14_bold": [
+          "base/chinese/garamond_14_bold_1of4.fnt",
+          "base/chinese/garamond_14_bold_2of4.fnt",
+          "base/chinese/garamond_14_bold_3of4.fnt",
+          "base/chinese/garamond_14_bold_4of4.fnt"
+        ],
+        "Main_16": [
+          "base/chinese/garamond_16_bold_1of4.fnt",
+          "base/chinese/garamond_16_bold_2of4.fnt",
+          "base/chinese/garamond_16_bold_3of4.fnt",
+          "base/chinese/garamond_16_bold_4of4.fnt"
+        ],
+        "standard_font": [
+          "base/chinese/standard_1of4.fnt",
+          "base/chinese/standard_2of4.fnt",
+          "base/chinese/standard_3of4.fnt",
+          "base/chinese/standard_4of4.fnt"
+        ],
+        "ToolTip_Font": [
+          "base/chinese/garamond_16_1of4.fnt",
+          "base/chinese/garamond_16_2of4.fnt",
+          "base/chinese/garamond_16_3of4.fnt",
+          "base/chinese/garamond_16_4of4.fnt"
+        ],
+        "vic_18": [
+          "base/chinese/vic_18_1of4.fnt",
+          "base/chinese/vic_18_2of4.fnt",
+          "base/chinese/vic_18_3of4.fnt",
+          "base/chinese/vic_18_4of4.fnt"
+        ],
+        "vic_22": [
+          "base/chinese/vic_22_1of4.fnt",
+          "base/chinese/vic_22_2of4.fnt",
+          "base/chinese/vic_22_3of4.fnt",
+          "base/chinese/vic_22_4of4.fnt"
+        ],
+        "tahoma_60": [
+          "base/chinese/hoi_mapfont4_1of11EX.fnt",
+          "base/chinese/hoi_mapfont4_2of11EX.fnt",
+          "base/chinese/hoi_mapfont4_3of11EX.fnt",
+          "base/chinese/hoi_mapfont4_4of11EX.fnt",
+          "base/chinese/hoi_mapfont4_5of11EX.fnt",
+          "base/chinese/hoi_mapfont4_6of11EX.fnt",
+          "base/chinese/hoi_mapfont4_7of11EX.fnt",
+          "base/chinese/hoi_mapfont4_8of11EX.fnt",
+          "base/chinese/hoi_mapfont4_9of11EX.fnt",
+          "base/chinese/hoi_mapfont4_10of11EX.fnt",
+          "base/chinese/hoi_mapfont4_11of11EX.fnt"
+        ]
+      }
+    },
+    "l_spanish": {
+      "families": {
+        "Arial12": [
+          "base/Arial12.fnt"
+        ],
+        "cg_16b": [
+          "base/cg_16b.fnt",
+          "base/hoi_16tooltip3.fnt"
+        ],
+        "chat_input_font": [
+          "base/standard.fnt"
+        ],
+        "eaw_diplo_16mbs": [
+          "mod/eaw_diplo_16mbs.fnt"
+        ],
+        "fix_36header": [
+          "mod/hoi_36header.fnt"
+        ],
+        "garamond_14": [
+          "base/garamond_14.fnt"
+        ],
+        "hoi4_typewriter16": [
+          "base/hoi4_typewriter16.fnt",
+          "base/hoi_16typewriter.fnt"
+        ],
+        "hoi4_typewriter16_inverted": [
+          "base/hoi4_typewriter16_inverted.fnt",
+          "base/hoi_16typewriter_inverted.fnt"
+        ],
+        "hoi4_typewriter22": [
+          "base/hoi4_typewriter22.fnt",
+          "base/hoi_22typewriter.fnt"
+        ],
+        "hoi4_typewriter22_inverted": [
+          "base/hoi4_typewriter22_inverted.fnt",
+          "base/hoi_22typewriter_inverted.fnt"
+        ],
+        "hoi_16mbs": [
+          "base/hoi_16mbs.fnt",
+          "base/hoi_16mbs_cryllic.fnt"
+        ],
+        "hoi_18": [
+          "base/hoi_18.fnt",
+          "base/hoi_18_cryllic.fnt"
+        ],
+        "hoi_18b": [
+          "base/hoi_18.fnt",
+          "base/hoi_18_cryllic.fnt"
+        ],
+        "hoi_18mbs": [
+          "base/hoi_18mbs.fnt",
+          "base/hoi_18mbs_cryllic.fnt"
+        ],
+        "hoi_20b": [
+          "base/hoi_20b.fnt"
+        ],
+        "hoi_20bs": [
+          "base/hoi_20bs.fnt"
+        ],
+        "hoi_22chat": [
+          "base/hoi_22tech.fnt"
+        ],
+        "hoi_22tech": [
+          "base/hoi_22tech.fnt"
+        ],
+        "hoi_24header": [
+          "mod/hoi_24header.fnt"
+        ],
+        "hoi_30": [
+          "base/hoi_30.fnt"
+        ],
+        "hoi_30header": [
+          "base/hoi_30header.fnt",
+          "mod/hoi_30header_extras.fnt"
+        ],
+        "hoi_33": [
+          "base/hoi_33.fnt"
+        ],
+        "hoi_36header": [
+          "mod/hoi_36header.fnt"
+        ],
+        "loadscreen_header": [
+          "base/hoi_30header.fnt",
+          "mod/hoi_30header_extras.fnt"
+        ],
+        "loadscreen_tip": [
+          "mod/hoi_24header.fnt"
+        ],
+        "Main_14": [
+          "base/garamond_14.fnt"
+        ],
+        "Main_14_black": [
+          "base/garamond_14_bold.fnt"
+        ],
+        "Main_14_bold": [
+          "base/garamond_14_bold.fnt"
+        ],
+        "Main_14_eu": [
+          "base/garamond_14.fnt"
+        ],
+        "Main_14_grey": [
+          "base/garamond_14.fnt"
+        ],
+        "Main_16": [
+          "base/garamond_16_bold.fnt"
+        ],
+        "standard_font": [
+          "base/standard.fnt"
+        ],
+        "ToolTip_Font": [
+          "base/garamond_16.fnt"
+        ],
+        "vic_18": [
+          "base/vic_18.fnt"
+        ],
+        "vic_22": [
+          "base/vic_22.fnt"
+        ],
+        "tahoma_60": [
+          "base/hoi_mapfont4.fnt"
+        ]
+      }
+    }
+  },
+  "metadata": {
+    "eligible_logical_fonts": 35,
+    "definitions_found": 200,
+    "used_font_names_found": 41,
+    "skipped_fonts": {
+      " ": "definition not found",
+      "hoi_20": "definition not found",
+      "invisiblefont": "technical font",
+      "list": "definition not found",
+      "slc_gauge_font16": "technical font",
+      "slc_gauge_font22": "technical font"
+    },
+    "language_specific_skips": {
+      "l_english": {},
+      "l_braz_por": {},
+      "l_french": {
+        "chat_input_font": "does not contain the language's basic writing system",
+        "garamond_14": "does not contain the language's basic writing system",
+        "hoi_30header": "does not contain the language's basic writing system",
+        "loadscreen_header": "does not contain the language's basic writing system",
+        "Main_14": "does not contain the language's basic writing system",
+        "Main_14_black": "does not contain the language's basic writing system",
+        "Main_14_bold": "does not contain the language's basic writing system",
+        "Main_14_eu": "does not contain the language's basic writing system",
+        "Main_14_grey": "does not contain the language's basic writing system",
+        "Main_16": "does not contain the language's basic writing system",
+        "standard_font": "does not contain the language's basic writing system",
+        "ToolTip_Font": "does not contain the language's basic writing system",
+        "vic_18": "does not contain the language's basic writing system",
+        "vic_22": "does not contain the language's basic writing system"
+      },
+      "l_german": {},
+      "l_japanese": {
+        "chat_input_font": "does not contain the language's basic writing system",
+        "eaw_diplo_16mbs": "does not contain the language's basic writing system",
+        "fix_36header": "does not contain the language's basic writing system",
+        "standard_font": "does not contain the language's basic writing system"
+      },
+      "l_korean": {
+        "eaw_diplo_16mbs": "does not contain the language's basic writing system",
+        "loadscreen_header": "does not contain the language's basic writing system",
+        "loadscreen_tip": "does not contain the language's basic writing system"
+      },
+      "l_polish": {
+        "chat_input_font": "does not contain the language's basic writing system",
+        "fix_36header": "does not contain the language's basic writing system",
+        "garamond_14": "does not contain the language's basic writing system",
+        "Main_14": "does not contain the language's basic writing system",
+        "Main_14_black": "does not contain the language's basic writing system",
+        "Main_14_bold": "does not contain the language's basic writing system",
+        "Main_14_eu": "does not contain the language's basic writing system",
+        "Main_14_grey": "does not contain the language's basic writing system",
+        "Main_16": "does not contain the language's basic writing system",
+        "standard_font": "does not contain the language's basic writing system",
+        "ToolTip_Font": "does not contain the language's basic writing system"
+      },
+      "l_russian": {
+        "Arial12": "does not contain the language's basic writing system",
+        "chat_input_font": "does not contain the language's basic writing system",
+        "garamond_14": "does not contain the language's basic writing system",
+        "Main_14": "does not contain the language's basic writing system",
+        "Main_14_black": "does not contain the language's basic writing system",
+        "Main_14_bold": "does not contain the language's basic writing system",
+        "Main_14_eu": "does not contain the language's basic writing system",
+        "Main_14_grey": "does not contain the language's basic writing system",
+        "Main_16": "does not contain the language's basic writing system",
+        "standard_font": "does not contain the language's basic writing system",
+        "ToolTip_Font": "does not contain the language's basic writing system"
+      },
+      "l_simp_chinese": {
+        "garamond_14": "does not contain the language's basic writing system",
+        "Main_14": "does not contain the language's basic writing system",
+        "Main_14_eu": "does not contain the language's basic writing system",
+        "Main_14_grey": "does not contain the language's basic writing system"
+      },
+      "l_spanish": {}
+    },
+    "missing_references": []
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "format_version": 1,
+  "excluded_characters": [],
+  "notepad_plus_plus_path": "",
+  "notepad_plus_plus_fullscreen": false,
+  "context_mod_path": "",
+  "hoi4_install_path": "",
+  "show_unknown_context_warnings": false,
+  "layout_focus_enabled": true,
+  "layout_focus_mode": "length",
+  "layout_focus_limit": 350,
+  "layout_focus_preview_cli_path": "",
+  "layout_focus_preview_priority": "auto_ru",
+  "layout_events_enabled": true,
+  "layout_event_limit": 3400,
+  "layout_welcome_enabled": true,
+  "layout_welcome_limit": 3400,
+  "compare_english_path": "",
+  "compare_russian_path": ""
+}

@@ -1,0 +1,157 @@
+# HOI4 LocalisationChecker
+
+Графический проверяющий локализаций для Hearts of Iron IV и Equestria at War.
+
+Текущая версия: **0.9.6F2 Beta**. Программа работает только на чтение и не
+изменяет выбранные файлы локализации.
+
+## Возможности
+
+- поиск символов, отсутствующих в подключённых UI-шрифтах;
+- мягкий, классический жёсткий и контекстный режимы проверки глифов;
+- пользовательские исключения символов;
+- проверка UTF-8, начального и вложенного BOM;
+- поиск незакрытых кавычек, неизвестных escape-последовательностей и дублей
+  ключей;
+- предупреждение о возможном mojibake;
+- проверка длины описаний фокусов, ивентов и вступительных экранов;
+- отдельная проверка наличия `\n` в описаниях фокусов;
+- точная проверка вместимости фокусов через EaW Focus Text Preview;
+- сравнение ключей в выбранных папках английской и русской локализации;
+- переход к найденной проблеме в Notepad++ и копирование ключа или символа.
+
+Подробное пользовательское руководство находится в [README.txt](README.txt),
+а список заметных изменений — в [CHANGELOG.md](CHANGELOG.md).
+
+## Установка готовой версии
+
+1. Откройте раздел **Releases** репозитория.
+2. Скачайте `LocalisationChecker-Windows.zip`.
+3. Распакуйте архив целиком.
+4. Запустите `LocalisationChecker.exe`.
+
+Не переносите один EXE отдельно: рядом нужны `_internal`, `fonts`,
+`font_profile.json`, `settings.json` и остальные файлы сборки.
+
+Программа предназначена для Windows. Установка Python для готовой версии не
+требуется.
+
+## Точная проверка фокусов
+
+Точный режим использует отдельный `EaWFocusTextPreviewCLI.exe`. В программе
+нужно выбрать именно этот EXE из полной папки EaW Focus Text Preview; соседняя
+папка `_internal` должна оставаться на месте.
+
+Политика проверки зафиксирована как `visual`:
+
+- зелёный — текст помещается;
+- жёлтый — допустим;
+- красный — выводится как предупреждение.
+
+EaW Focus Text Preview не входит в этот репозиторий и не включается в сборку
+LocalisationChecker.
+
+## Запуск из исходного кода
+
+Понадобятся Windows, Python 3.12 или новее и локально установленные Hearts of
+Iron IV и Equestria at War.
+
+```powershell
+cd HOI4_Localisation_Checker
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
+```
+
+Игровые `.fnt` не публикуются вместе с исходниками. Подготовьте их из своих
+локальных установок:
+
+```powershell
+.\.venv\Scripts\python.exe tools\prepare_font_resources.py `
+  --game-root "C:\Program Files (x86)\Steam\steamapps\common\Hearts of Iron IV" `
+  --mod-root "C:\path\to\equestria_dev"
+```
+
+После этого программу можно запустить:
+
+```powershell
+.\.venv\Scripts\python.exe app.py
+```
+
+Файлы в `fonts/base` и `fonts/mod` игнорируются Git. Подробнее:
+[fonts/README.md](fonts/README.md).
+
+## Тесты
+
+```powershell
+.\run_tests.ps1
+```
+
+Либо напрямую:
+
+```powershell
+$env:PYTHONPATH = (Join-Path (Get-Location) "src")
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
+
+## Сборка EXE
+
+Сначала убедитесь, что локальные ресурсы шрифтов подготовлены:
+
+```powershell
+.\.venv\Scripts\python.exe tools\prepare_font_resources.py --check-only
+.\build.ps1
+```
+
+Результаты появятся в `dist`:
+
+- `dist/LocalisationChecker/LocalisationChecker.exe`;
+- `dist/LocalisationChecker-Windows.zip`.
+
+`build`, `dist`, виртуальное окружение, пользовательские настройки и игровые
+ресурсы не должны попадать в историю Git. Готовый ZIP публикуется как файл
+GitHub Release.
+
+## Настройки
+
+Настройки хранятся в `settings.json` рядом с программой. Этот файл может
+содержать абсолютные пути пользователя, поэтому он игнорируется Git. Для
+сборки используется безопасный [settings.example.json](settings.example.json)
+с пустыми путями.
+
+## Структура проекта
+
+```text
+src/                         исходный код приложения
+tests/                       автоматические тесты
+tools/                       служебные скрипты
+fonts/README.md              подготовка локальных игровых шрифтов
+font_profile.json            профиль используемых семейств шрифтов
+settings.example.json        чистый шаблон настроек
+build.ps1                    тестирование и сборка Windows-архива
+```
+
+## Участие в разработке
+
+Правила подготовки изменений описаны в
+[CONTRIBUTING.md](CONTRIBUTING.md). Сообщение об ошибке желательно сопровождать
+версией программы, режимом проверки, примером локализации и шагами
+воспроизведения. Не прикладывайте закрытые файлы мода без разрешения.
+
+## Лицензия и сторонние материалы
+
+Исходный код LocalisationChecker распространяется по максимально разрешительной
+лицензии [0BSD](LICENSE). Она разрешает использование, изменение и
+распространение кода для любых целей.
+
+Игровые ресурсы, Hearts of Iron IV, Equestria at War, EaW Focus Text Preview и
+Notepad++ не переходят под лицензию проекта. Подробности указаны в
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+LocalisationChecker — неофициальный инструмент, созданный участником проекта
+Equestria at War. Он не является официальным продуктом Paradox Interactive
+или команды Equestria at War.
+
+## Благодарности
+
+Спасибо Скоргу за участие в бета-тестировании и предложения по развитию
+проверки локализаций.

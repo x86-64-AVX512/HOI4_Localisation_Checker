@@ -1,0 +1,39 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unittest:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.14"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Compile source
+        shell: pwsh
+        run: python -m compileall -q src app.py tools
+
+      - name: Run unit tests
+        shell: pwsh
+        env:
+          PYTHONPATH: ${{ github.workspace }}\src
+        run: python -m unittest discover -s tests -v
+
+      - name: Check font preparation CLI
+        shell: pwsh
+        run: python tools/prepare_font_resources.py --help
