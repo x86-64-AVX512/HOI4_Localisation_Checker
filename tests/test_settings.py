@@ -55,6 +55,7 @@ class SettingsTests(unittest.TestCase):
                     context_mod_path=r"C:\Mods\eaw_dev",
                     hoi4_install_path=r"D:\Steam\Hearts of Iron IV",
                     show_unknown_context_warnings=True,
+                    check_russian_straight_quotes=False,
                     layout_focus_enabled=True,
                     layout_focus_mode="newline",
                     layout_focus_limit=347,
@@ -84,6 +85,7 @@ class SettingsTests(unittest.TestCase):
                 loaded.hoi4_install_path,
             )
             self.assertTrue(loaded.show_unknown_context_warnings)
+            self.assertFalse(loaded.check_russian_straight_quotes)
             self.assertTrue(loaded.layout_focus_enabled)
             self.assertEqual("newline", loaded.layout_focus_mode)
             self.assertEqual(347, loaded.layout_focus_limit)
@@ -133,6 +135,9 @@ class SettingsTests(unittest.TestCase):
             self.assertFalse(load_settings(path).notepad_plus_plus_fullscreen)
             self.assertFalse(
                 load_settings(path).show_unknown_context_warnings
+            )
+            self.assertTrue(
+                load_settings(path).check_russian_straight_quotes
             )
             self.assertTrue(load_settings(path).layout_focus_enabled)
             self.assertEqual("length", load_settings(path).layout_focus_mode)

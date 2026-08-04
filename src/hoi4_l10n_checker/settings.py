@@ -18,6 +18,7 @@ class AppSettings:
     context_mod_path: str = ""
     hoi4_install_path: str = ""
     show_unknown_context_warnings: bool = False
+    check_russian_straight_quotes: bool = True
     layout_focus_enabled: bool = True
     layout_focus_mode: str = "length"
     layout_focus_limit: int = 350
@@ -88,6 +89,10 @@ def load_settings(path: Path) -> AppSettings:
             "Значение show_unknown_context_warnings в настройках "
             "не является логическим."
         )
+    raw_check_russian_straight_quotes = data.get(
+        "check_russian_straight_quotes",
+        True,
+    )
     raw_layout_focus_enabled = data.get("layout_focus_enabled", True)
     raw_layout_focus_mode = data.get("layout_focus_mode", "length")
     raw_layout_focus_limit = data.get("layout_focus_limit", 350)
@@ -108,6 +113,10 @@ def load_settings(path: Path) -> AppSettings:
     raw_export_directory = data.get("export_directory", "")
 
     for name, value in (
+        (
+            "check_russian_straight_quotes",
+            raw_check_russian_straight_quotes,
+        ),
         ("layout_focus_enabled", raw_layout_focus_enabled),
         ("layout_events_enabled", raw_layout_events_enabled),
         ("layout_welcome_enabled", raw_layout_welcome_enabled),
@@ -161,6 +170,9 @@ def load_settings(path: Path) -> AppSettings:
         context_mod_path=raw_context_mod_path,
         hoi4_install_path=raw_hoi4_install_path,
         show_unknown_context_warnings=raw_show_unknown_context,
+        check_russian_straight_quotes=(
+            raw_check_russian_straight_quotes
+        ),
         layout_focus_enabled=raw_layout_focus_enabled,
         layout_focus_mode=raw_layout_focus_mode,
         layout_focus_limit=raw_layout_focus_limit,
@@ -199,6 +211,9 @@ def save_settings(
         "hoi4_install_path": settings.hoi4_install_path,
         "show_unknown_context_warnings": (
             settings.show_unknown_context_warnings
+        ),
+        "check_russian_straight_quotes": (
+            settings.check_russian_straight_quotes
         ),
         "layout_focus_enabled": settings.layout_focus_enabled,
         "layout_focus_mode": settings.layout_focus_mode,
@@ -244,6 +259,9 @@ def save_excluded_characters(path: Path, characters: Iterable[str]) -> None:
             hoi4_install_path=existing.hoi4_install_path,
             show_unknown_context_warnings=(
                 existing.show_unknown_context_warnings
+            ),
+            check_russian_straight_quotes=(
+                existing.check_russian_straight_quotes
             ),
             layout_focus_enabled=existing.layout_focus_enabled,
             layout_focus_mode=existing.layout_focus_mode,

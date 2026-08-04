@@ -576,6 +576,83 @@ class CheckerTests(unittest.TestCase):
                 {diagnostic.code for diagnostic in result.diagnostics},
             )
 
+    def test_straight_quotes_are_reported_only_inside_russian_values(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            profile = self.create_profile(root)
+            localisation = root / "quotes.yml"
+            escaped_russian_line = (
+                ' RU_ESCAPED:0 "Он сказал \\"да\\" и ушёл."'
+            )
+            plain_russian_line = (
+                ' RU_PLAIN:0 "Он сказал "нет" и ушёл."'
+            )
+            self.write_localisation(
+                localisation,
+                (
+                    "l_russian:\n"
+                    f"{escaped_russian_line}\n"
+                    f"{plain_russian_line}\n"
+                    ' GUILLEMETS:0 "Он сказал «да»."\n'
+                    "l_english:\n"
+                    ' EN_KEY:0 "He said \\"yes\\" and left."\n'
+                ),
+            )
+
+            result = LocalisationChecker(profile).scan(localisation)
+            warnings = [
+                diagnostic
+                for diagnostic in result.diagnostics
+                if diagnostic.code == "STRAIGHT_QUOTE"
+            ]
+
+            expected_by_key = {
+                "RU_ESCAPED": [
+                    index + 1
+                    for index, character in enumerate(escaped_russian_line)
+                    if character == '"'
+                ][1:-1],
+                "RU_PLAIN": [
+                    index + 1
+                    for index, character in enumerate(plain_russian_line)
+                    if character == '"'
+                ][1:-1],
+            }
+            actual_by_key = {
+                key: [
+                    item.column
+                    for item in warnings
+                    if item.key == key
+                ]
+                for key in expected_by_key
+            }
+            self.assertEqual(4, len(warnings))
+            self.assertEqual(expected_by_key, actual_by_key)
+            self.assertTrue(all(item.character == '"' for item in warnings))
+            self.assertTrue(all(item.selection_length == 1 for item in warnings))
+
+    def test_russian_straight_quote_check_can_be_disabled(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            profile = self.create_profile(root)
+            localisation = root / "quotes.yml"
+            self.write_localisation(
+                localisation,
+                'l_russian:\n RU_KEY:0 "Он сказал \\"да\\"."\n',
+            )
+
+            result = LocalisationChecker(profile).scan(
+                localisation,
+                check_russian_straight_quotes=False,
+            )
+
+            self.assertNotIn(
+                "STRAIGHT_QUOTE",
+                {diagnostic.code for diagnostic in result.diagnostics},
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

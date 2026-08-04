@@ -103,6 +103,9 @@ class CheckerApplication:
             self.show_unknown_context_warnings = (
                 settings.show_unknown_context_warnings
             )
+            self.check_russian_straight_quotes = (
+                settings.check_russian_straight_quotes
+            )
             self.layout_focus_enabled = settings.layout_focus_enabled
             self.layout_focus_mode = settings.layout_focus_mode
             self.layout_focus_limit = settings.layout_focus_limit
@@ -126,6 +129,7 @@ class CheckerApplication:
             self.context_mod_path = ""
             self.hoi4_install_path = ""
             self.show_unknown_context_warnings = False
+            self.check_russian_straight_quotes = True
             self.layout_focus_enabled = True
             self.layout_focus_mode = "length"
             self.layout_focus_limit = 350
@@ -390,6 +394,33 @@ class CheckerApplication:
             sticky=tk.W,
             pady=(7, 0),
         )
+
+        additional_checks_frame = ttk.LabelFrame(
+            outer,
+            text="Дополнительные проверки",
+            padding=(10, 6),
+        )
+        additional_checks_frame.pack(fill=tk.X, pady=(10, 0))
+        self.russian_straight_quotes_var = tk.BooleanVar(
+            value=self.check_russian_straight_quotes
+        )
+        self.russian_straight_quotes_button = ttk.Checkbutton(
+            additional_checks_frame,
+            text=(
+                'Предупреждать о прямых кавычках "…" '
+                "в русской локализации"
+            ),
+            variable=self.russian_straight_quotes_var,
+            command=self._russian_straight_quotes_changed,
+        )
+        self.russian_straight_quotes_button.pack(side=tk.LEFT)
+        ttk.Label(
+            additional_checks_frame,
+            text=(
+                "Проверяется только текст под l_russian:; "
+                "служебные кавычки вокруг значения не учитываются."
+            ),
+        ).pack(side=tk.LEFT, padx=(16, 0))
 
         editor_frame = ttk.LabelFrame(
             outer,
@@ -2031,6 +2062,7 @@ class CheckerApplication:
         self.contextual_mode_button.configure(state=mode_state)
         self.context_mod_button.configure(state=state)
         self.show_unknown_context_button.configure(state=state)
+        self.russian_straight_quotes_button.configure(state=state)
         self._refresh_layout_controls()
         self._refresh_compare_controls()
         self._refresh_export_controls()
@@ -2154,6 +2186,9 @@ class CheckerApplication:
         show_unknown_context_warnings = (
             self.show_unknown_context_warnings
         )
+        check_russian_straight_quotes = (
+            self.check_russian_straight_quotes
+        )
         self.summary_var.set(f"Проверяется: {target}")
         if glyph_mode == "contextual":
             game_note = (
@@ -2181,6 +2216,9 @@ class CheckerApplication:
                     context_game_root=context_game_root,
                     show_unknown_context_warnings=(
                         show_unknown_context_warnings
+                    ),
+                    check_russian_straight_quotes=(
+                        check_russian_straight_quotes
                     ),
                 )
                 self.events.put(("result", (result, glyph_mode)))
@@ -3054,6 +3092,9 @@ class CheckerApplication:
                 show_unknown_context_warnings=(
                     self.show_unknown_context_warnings
                 ),
+                check_russian_straight_quotes=(
+                    self.check_russian_straight_quotes
+                ),
                 layout_focus_enabled=self.layout_focus_enabled,
                 layout_focus_mode=self.layout_focus_mode,
                 layout_focus_limit=self.layout_focus_limit,
@@ -3154,6 +3195,30 @@ class CheckerApplication:
         )
         self.current_file_var.set(
             f"Ключи с неопределённым контекстом {state}."
+        )
+
+    def _russian_straight_quotes_changed(self) -> None:
+        previous = self.check_russian_straight_quotes
+        self.check_russian_straight_quotes = (
+            self.russian_straight_quotes_var.get()
+        )
+        try:
+            self._save_current_settings()
+        except SettingsError as error:
+            self.check_russian_straight_quotes = previous
+            self.russian_straight_quotes_var.set(previous)
+            messagebox.showerror(
+                "Настройка проверки кавычек не сохранена",
+                str(error),
+            )
+            return
+        state = (
+            "включена"
+            if self.check_russian_straight_quotes
+            else "выключена"
+        )
+        self.current_file_var.set(
+            f"Проверка прямых кавычек в русской локализации {state}."
         )
 
     def _notepad_window_mode_changed(self) -> None:

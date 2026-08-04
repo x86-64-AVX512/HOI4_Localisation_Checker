@@ -276,6 +276,35 @@ def _duplicate_diagnostics(
     return diagnostics
 
 
+def _russian_straight_quote_diagnostics(
+    entries: Iterable[LocalisationEntry],
+) -> list[Diagnostic]:
+    diagnostics: list[Diagnostic] = []
+    for entry in entries:
+        if entry.language.casefold() != "l_russian":
+            continue
+        for offset, character in enumerate(entry.raw_value):
+            if character != '"':
+                continue
+            diagnostics.append(
+                Diagnostic(
+                    severity="warning",
+                    code="STRAIGHT_QUOTE",
+                    path=entry.path,
+                    line=entry.line,
+                    column=entry.value_column + offset,
+                    message=(
+                        "В русском тексте обнаружена прямая кавычка "
+                        '«"» (U+0022).'
+                    ),
+                    key=entry.key,
+                    character='"',
+                    selection_length=1,
+                )
+            )
+    return diagnostics
+
+
 class LocalisationChecker:
     def __init__(self, font_profile: FontProfile | None) -> None:
         self.font_profile = font_profile
@@ -289,6 +318,7 @@ class LocalisationChecker:
         context_mod_root: Path | None = None,
         context_game_root: Path | None = None,
         show_unknown_context_warnings: bool = False,
+        check_russian_straight_quotes: bool = True,
     ) -> ScanResult:
         target = target.resolve()
         files = _collect_files(target)
@@ -336,6 +366,10 @@ class LocalisationChecker:
                     )
 
         diagnostics.extend(_duplicate_diagnostics(entries))
+        if check_russian_straight_quotes:
+            diagnostics.extend(
+                _russian_straight_quote_diagnostics(entries)
+            )
         context: FontContextIndex | None = None
         contextual_filtered = 0
         contextual_unresolved = 0

@@ -6,6 +6,7 @@
   "context_mod_path": "",
   "hoi4_install_path": "",
   "show_unknown_context_warnings": false,
+  "check_russian_straight_quotes": true,
   "layout_focus_enabled": true,
   "layout_focus_mode": "length",
   "layout_focus_limit": 350,
