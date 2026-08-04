@@ -29,6 +29,7 @@ class AppSettings:
     layout_welcome_limit: int = 3400
     compare_english_path: str = ""
     compare_russian_path: str = ""
+    export_directory: str = ""
 
 
 def settings_path_for(app_root: Path) -> Path:
@@ -104,6 +105,7 @@ def load_settings(path: Path) -> AppSettings:
     raw_layout_welcome_limit = data.get("layout_welcome_limit", 3400)
     raw_compare_english_path = data.get("compare_english_path", "")
     raw_compare_russian_path = data.get("compare_russian_path", "")
+    raw_export_directory = data.get("export_directory", "")
 
     for name, value in (
         ("layout_focus_enabled", raw_layout_focus_enabled),
@@ -117,6 +119,7 @@ def load_settings(path: Path) -> AppSettings:
     for name, value in (
         ("compare_english_path", raw_compare_english_path),
         ("compare_russian_path", raw_compare_russian_path),
+        ("export_directory", raw_export_directory),
     ):
         if not isinstance(value, str):
             raise SettingsError(
@@ -171,6 +174,7 @@ def load_settings(path: Path) -> AppSettings:
         layout_welcome_limit=raw_layout_welcome_limit,
         compare_english_path=raw_compare_english_path,
         compare_russian_path=raw_compare_russian_path,
+        export_directory=raw_export_directory,
     )
 
 
@@ -211,6 +215,7 @@ def save_settings(
         "layout_welcome_limit": settings.layout_welcome_limit,
         "compare_english_path": settings.compare_english_path,
         "compare_russian_path": settings.compare_russian_path,
+        "export_directory": settings.export_directory,
     }
 
     try:
@@ -255,5 +260,6 @@ def save_excluded_characters(path: Path, characters: Iterable[str]) -> None:
             layout_welcome_limit=existing.layout_welcome_limit,
             compare_english_path=existing.compare_english_path,
             compare_russian_path=existing.compare_russian_path,
+            export_directory=existing.export_directory,
         ),
     )

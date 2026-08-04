@@ -29,7 +29,7 @@ python tools/prepare_font_resources.py --check-only
 
 ## GitHub Release
 
-- [ ] Создан тег вида `v0.9.6F2-beta`.
+- [ ] Создан тег вида `v0.9.6F3-beta`.
 - [ ] Релиз отмечен как Pre-release.
 - [ ] Приложен только полный `LocalisationChecker-Windows.zip`, а не один
       EXE без `_internal` и ресурсов.

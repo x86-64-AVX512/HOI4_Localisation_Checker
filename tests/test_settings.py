@@ -68,6 +68,7 @@ class SettingsTests(unittest.TestCase):
                     layout_welcome_limit=3350,
                     compare_english_path=r"C:\Mod\localisation\english",
                     compare_russian_path=r"C:\Mod\localisation\russian",
+                    export_directory=r"D:\Checker exports",
                 ),
             )
 
@@ -105,6 +106,10 @@ class SettingsTests(unittest.TestCase):
             self.assertEqual(
                 r"C:\Mod\localisation\russian",
                 loaded.compare_russian_path,
+            )
+            self.assertEqual(
+                r"D:\Checker exports",
+                loaded.export_directory,
             )
             self.assertNotIn(
                 "layout_focus_preview_policy",
@@ -146,6 +151,7 @@ class SettingsTests(unittest.TestCase):
             self.assertEqual(3400, load_settings(path).layout_welcome_limit)
             self.assertEqual("", load_settings(path).compare_english_path)
             self.assertEqual("", load_settings(path).compare_russian_path)
+            self.assertEqual("", load_settings(path).export_directory)
 
     def test_legacy_cli_policy_is_ignored_and_not_saved(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

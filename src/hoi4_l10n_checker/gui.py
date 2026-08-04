@@ -5,11 +5,13 @@ import threading
 import tkinter as tk
 import unicodedata
 from dataclasses import replace
+from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import cast
 
 from .checker import GlyphMode, LocalisationChecker, ScanResult
+from .csv_export import export_csv
 from .font_context import (
     find_hoi4_install,
     find_mod_root,
@@ -116,6 +118,7 @@ class CheckerApplication:
             self.layout_welcome_limit = settings.layout_welcome_limit
             self.compare_english_path = settings.compare_english_path
             self.compare_russian_path = settings.compare_russian_path
+            self.export_directory = settings.export_directory
         except SettingsError as error:
             self.excluded_characters: set[str] = set()
             self.notepad_plus_plus_path = ""
@@ -134,6 +137,7 @@ class CheckerApplication:
             self.layout_welcome_limit = 3400
             self.compare_english_path = ""
             self.compare_russian_path = ""
+            self.export_directory = ""
             self.settings_error = str(error)
 
         self.root.title(f"HOI4 Localisation Checker — {DISPLAY_VERSION}")
@@ -221,6 +225,18 @@ class CheckerApplication:
             state=tk.DISABLED,
         )
         self.copy_character_button.pack(side=tk.LEFT, padx=(8, 0))
+
+        self.export_button = ttk.Button(
+            controls,
+            text="Выгрузить результаты…",
+            command=lambda: self._export_table_results(
+                self.table,
+                "localisation_check",
+                self.current_file_var,
+            ),
+            state=tk.DISABLED,
+        )
+        self.export_button.pack(side=tk.LEFT, padx=(8, 0))
 
         self.summary_var = tk.StringVar(value="Выберите .yml-файл или папку.")
         ttk.Label(controls, textvariable=self.summary_var).pack(
@@ -509,6 +525,7 @@ class CheckerApplication:
 
         self._build_layout_tab()
         self._build_compare_tab()
+        self._refresh_export_controls()
 
     def _build_layout_tab(self) -> None:
         outer = ttk.Frame(self.notebook, padding=12)
@@ -541,6 +558,17 @@ class CheckerApplication:
             state=tk.DISABLED,
         )
         self.layout_copy_key_button.pack(side=tk.LEFT, padx=(8, 0))
+        self.layout_export_button = ttk.Button(
+            controls,
+            text="Выгрузить результаты…",
+            command=lambda: self._export_table_results(
+                self.layout_table,
+                "text_layout",
+                self.layout_current_file_var,
+            ),
+            state=tk.DISABLED,
+        )
+        self.layout_export_button.pack(side=tk.LEFT, padx=(8, 0))
         self.layout_summary_var = tk.StringVar(
             value="Выберите .yml-файл или папку."
         )
@@ -1084,6 +1112,17 @@ class CheckerApplication:
             state=tk.DISABLED,
         )
         self.compare_copy_key_button.pack(side=tk.LEFT, padx=(8, 0))
+        self.compare_export_button = ttk.Button(
+            controls,
+            text="Выгрузить результаты…",
+            command=lambda: self._export_table_results(
+                self.compare_table,
+                "key_comparison",
+                self.compare_status_var,
+            ),
+            state=tk.DISABLED,
+        )
+        self.compare_export_button.pack(side=tk.LEFT, padx=(8, 0))
         self.compare_summary_var = tk.StringVar(
             value="Укажите папку мода и запустите сравнение."
         )
@@ -1994,6 +2033,23 @@ class CheckerApplication:
         self.show_unknown_context_button.configure(state=state)
         self._refresh_layout_controls()
         self._refresh_compare_controls()
+        self._refresh_export_controls()
+
+    def _refresh_export_controls(self) -> None:
+        controls = (
+            (self.export_button, self.table),
+            (self.layout_export_button, self.layout_table),
+            (self.compare_export_button, self.compare_table),
+        )
+        for button, table in controls:
+            has_rows = bool(table.get_children(""))
+            button.configure(
+                state=(
+                    tk.NORMAL
+                    if not self.busy and has_rows
+                    else tk.DISABLED
+                )
+            )
 
     def _clear_results(self) -> None:
         for item in self.table.get_children():
@@ -2005,6 +2061,7 @@ class CheckerApplication:
         self.progress.configure(value=0, maximum=1)
         self.copy_key_button.configure(state=tk.DISABLED)
         self.copy_character_button.configure(state=tk.DISABLED)
+        self._refresh_export_controls()
 
     def _clear_layout_results(self) -> None:
         for item in self.layout_table.get_children():
@@ -2019,6 +2076,7 @@ class CheckerApplication:
         self.layout_progress.configure(mode="determinate")
         self.layout_progress.configure(value=0, maximum=1)
         self.layout_copy_key_button.configure(state=tk.DISABLED)
+        self._refresh_export_controls()
 
     def _clear_compare_results(self) -> None:
         for item in self.compare_table.get_children():
@@ -2034,6 +2092,7 @@ class CheckerApplication:
         self.compare_progress.configure(value=0, maximum=1)
         self.compare_copy_key_button.configure(state=tk.DISABLED)
         self._refresh_compare_open_controls(None)
+        self._refresh_export_controls()
 
     def _start_localisation_comparison(self) -> None:
         if self.worker is not None and self.worker.is_alive():
@@ -2376,6 +2435,7 @@ class CheckerApplication:
 
         if not result.diagnostics:
             self.detail_var.set("Проблем не обнаружено.")
+        self._refresh_export_controls()
 
     def _insert_diagnostic(self, diagnostic: Diagnostic) -> None:
         level = "Ошибка" if diagnostic.severity == "error" else "Предупреждение"
@@ -2447,6 +2507,7 @@ class CheckerApplication:
                 "Часть фокусов не проверена точным модулем",
                 shown,
             )
+        self._refresh_export_controls()
 
     def _show_compare_result(
         self,
@@ -2527,6 +2588,7 @@ class CheckerApplication:
             self.compare_detail_var.set(
                 "Различий, дублей и ошибок разбора не обнаружено."
             )
+        self._refresh_export_controls()
         return "break"
 
     @staticmethod
@@ -3007,7 +3069,67 @@ class CheckerApplication:
                 layout_welcome_limit=self.layout_welcome_limit,
                 compare_english_path=self.compare_english_path,
                 compare_russian_path=self.compare_russian_path,
+                export_directory=self.export_directory,
             ),
+        )
+
+    def _export_table_results(
+        self,
+        table: ttk.Treeview,
+        filename_prefix: str,
+        status_var: tk.StringVar,
+    ) -> None:
+        items = table.get_children("")
+        if not items:
+            self.root.bell()
+            return
+
+        initial_directory = Path(self.export_directory)
+        if not initial_directory.is_dir():
+            initial_directory = self.app_root
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        selected = filedialog.asksaveasfilename(
+            parent=self.root,
+            title="Выгрузить результаты в CSV",
+            initialdir=str(initial_directory),
+            initialfile=f"{filename_prefix}_{timestamp}.csv",
+            defaultextension=".csv",
+            filetypes=(("CSV-файлы", "*.csv"), ("Все файлы", "*.*")),
+        )
+        if not selected:
+            return
+
+        path = Path(selected)
+        columns = tuple(str(column) for column in table["columns"])
+        headers = tuple(
+            str(table.heading(column, "text")).replace(" ↕", "")
+            for column in columns
+        )
+        rows = (
+            tuple(table.item(item, "values"))
+            for item in items
+        )
+        try:
+            row_count = export_csv(path, headers, rows)
+        except (OSError, UnicodeError) as error:
+            messagebox.showerror(
+                "Не удалось выгрузить результаты",
+                f"Файл не сохранён:\n{path}\n\n{error}",
+            )
+            return
+
+        previous_directory = self.export_directory
+        self.export_directory = str(path.parent)
+        try:
+            self._save_current_settings()
+        except SettingsError as error:
+            self.export_directory = previous_directory
+            messagebox.showwarning(
+                "Папка выгрузки не запомнена",
+                f"CSV сохранён, но настройку сохранить не удалось:\n{error}",
+            )
+        status_var.set(
+            f"Выгружено строк: {row_count}; файл: {path}"
         )
 
     def _unknown_context_visibility_changed(self) -> None:

@@ -16,5 +16,6 @@
   "layout_welcome_enabled": true,
   "layout_welcome_limit": 3400,
   "compare_english_path": "",
-  "compare_russian_path": ""
+  "compare_russian_path": "",
+  "export_directory": ""
 }
