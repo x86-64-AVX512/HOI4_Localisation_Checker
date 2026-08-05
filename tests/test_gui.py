@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from hoi4_l10n_checker import gui as gui_module
+from hoi4_l10n_checker.background_tasks import TaskFailed, TaskProgress
 from hoi4_l10n_checker.gui import CheckerApplication
 from hoi4_l10n_checker.gui_compare_tab import FILTER_LABELS
 from hoi4_l10n_checker.localisation_compare import (
@@ -221,8 +222,12 @@ class GuiTests(unittest.TestCase):
     def test_progress_and_failure_events_restore_ui_state(self) -> None:
         current_path = self.app_root / "current.yml"
         self.app._set_busy(True)
-        self.app.events.put(("progress", (2, 5, current_path)))
-        self.app.events.put(("failure", RuntimeError("simulated failure")))
+        self.app.tasks.post(
+            TaskProgress("localisation", 2, 5, current_path)
+        )
+        self.app.tasks.post(
+            TaskFailed("localisation", RuntimeError("simulated failure"))
+        )
 
         with patch.object(gui_module.messagebox, "showerror") as showerror:
             self.app._poll_events()

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import queue
 import threading
 import tkinter as tk
 import unicodedata
@@ -10,6 +9,14 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import cast
 
+from .background_tasks import (
+    BackgroundTaskRunner,
+    TaskFailed,
+    TaskNotice,
+    TaskProgress,
+    TaskReporter,
+    TaskSucceeded,
+)
 from .checker import GlyphMode, LocalisationChecker, ScanResult
 from .csv_export import export_csv
 from .focus_preview_cli import (
@@ -58,8 +65,7 @@ class CheckerApplication:
     def __init__(self, root: tk.Tk, app_root: Path) -> None:
         self.root = root
         self.app_root = app_root
-        self.events: queue.Queue[tuple[str, object]] = queue.Queue()
-        self.worker: threading.Thread | None = None
+        self.tasks = BackgroundTaskRunner()
         self.busy = False
         self.diagnostics_by_item: dict[str, Diagnostic] = {}
         self.settings_path = settings_path_for(app_root)
@@ -1062,7 +1068,7 @@ class CheckerApplication:
         self._refresh_export_controls()
 
     def _start_localisation_comparison(self) -> None:
-        if self.worker is not None and self.worker.is_alive():
+        if self.tasks.is_running:
             return
 
         folders = self._require_compare_folders()
@@ -1074,29 +1080,19 @@ class CheckerApplication:
         english_root, russian_root = folders
 
         self.compare_tab.prepare_comparison(english_root, russian_root)
-        self._set_busy(True)
 
-        def progress(current: int, total: int, path: Path) -> None:
-            self.events.put(
-                ("compare_progress", (current, total, path))
+        def work(reporter: TaskReporter) -> LocalisationComparisonResult:
+            return self.localisation_comparator.scan(
+                english_root,
+                russian_root,
+                progress=reporter.progress,
             )
 
-        def work() -> None:
-            try:
-                result = self.localisation_comparator.scan(
-                    english_root,
-                    russian_root,
-                    progress=progress,
-                )
-                self.events.put(("compare_result", result))
-            except Exception as error:  # UI boundary: keep the app alive.
-                self.events.put(("compare_failure", error))
-
-        self.worker = threading.Thread(target=work, daemon=True)
-        self.worker.start()
+        if self.tasks.start("comparison", work):
+            self._set_busy(True)
 
     def _start_scan(self, target: Path) -> None:
-        if self.worker is not None and self.worker.is_alive():
+        if self.tasks.is_running:
             return
 
         glyph_mode = cast(GlyphMode, self.glyph_mode_var.get())
@@ -1112,7 +1108,6 @@ class CheckerApplication:
             context_game_root = self._resolve_hoi4_install()
 
         self._clear_results()
-        self._set_busy(True)
         excluded_characters = frozenset(self.excluded_characters)
         show_unknown_context_warnings = (
             self.show_unknown_context_warnings
@@ -1133,34 +1128,28 @@ class CheckerApplication:
         else:
             self.current_file_var.set("Подготовка проверки…")
 
-        def progress(current: int, total: int, path: Path) -> None:
-            self.events.put(("progress", (current, total, path)))
+        def work(reporter: TaskReporter) -> tuple[ScanResult, GlyphMode]:
+            result = self.checker.scan(
+                target,
+                progress=reporter.progress,
+                glyph_mode=glyph_mode,
+                excluded_characters=excluded_characters,
+                context_mod_root=context_mod_root,
+                context_game_root=context_game_root,
+                show_unknown_context_warnings=(
+                    show_unknown_context_warnings
+                ),
+                check_russian_straight_quotes=(
+                    check_russian_straight_quotes
+                ),
+            )
+            return result, glyph_mode
 
-        def work() -> None:
-            try:
-                result = self.checker.scan(
-                    target,
-                    progress=progress,
-                    glyph_mode=glyph_mode,
-                    excluded_characters=excluded_characters,
-                    context_mod_root=context_mod_root,
-                    context_game_root=context_game_root,
-                    show_unknown_context_warnings=(
-                        show_unknown_context_warnings
-                    ),
-                    check_russian_straight_quotes=(
-                        check_russian_straight_quotes
-                    ),
-                )
-                self.events.put(("result", (result, glyph_mode)))
-            except Exception as error:  # UI boundary: keep the app alive.
-                self.events.put(("failure", error))
-
-        self.worker = threading.Thread(target=work, daemon=True)
-        self.worker.start()
+        if self.tasks.start("localisation", work):
+            self._set_busy(True)
 
     def _start_layout_scan(self, target: Path) -> None:
-        if self.worker is not None and self.worker.is_alive():
+        if self.tasks.is_running:
             return
 
         previous = (
@@ -1231,130 +1220,141 @@ class CheckerApplication:
             target,
             f"Контекст: {context_mod_root}{game_note}",
         )
-        self._set_busy(True)
 
-        def progress(current: int, total: int, path: Path) -> None:
-            self.events.put(
-                ("layout_progress", (current, total, path))
+        def work(reporter: TaskReporter) -> TextLayoutResult:
+            return self.text_layout_checker.scan(
+                target=target,
+                mod_root=context_mod_root,
+                options=options,
+                game_root=context_game_root,
+                progress=reporter.progress,
+                preview_started=lambda total: reporter.notify(
+                    "preview_started",
+                    total,
+                ),
             )
 
-        def preview_started(total: int) -> None:
-            self.events.put(("layout_preview_started", total))
-
-        def work() -> None:
-            try:
-                result = self.text_layout_checker.scan(
-                    target=target,
-                    mod_root=context_mod_root,
-                    options=options,
-                    game_root=context_game_root,
-                    progress=progress,
-                    preview_started=preview_started,
-                )
-                self.events.put(("layout_result", result))
-            except Exception as error:  # UI boundary: keep the app alive.
-                self.events.put(("layout_failure", error))
-
-        self.worker = threading.Thread(target=work, daemon=True)
-        self.worker.start()
+        if self.tasks.start("layout", work):
+            self._set_busy(True)
 
     def _poll_events(self) -> None:
         try:
-            while True:
-                event, payload = self.events.get_nowait()
-                if event == "progress":
-                    current, total, path = payload
-                    self.progress.configure(maximum=total, value=current)
-                    self.current_file_var.set(str(path))
-                elif event == "result":
-                    result, glyph_mode = payload
-                    self._show_result(result, glyph_mode)
-                    self._set_busy(False)
-                elif event == "failure":
-                    self._set_busy(False)
-                    self.summary_var.set("Проверка завершилась внутренней ошибкой.")
-                    messagebox.showerror("Ошибка", str(payload))
-                elif event == "layout_progress":
-                    current, total, path = payload
-                    self.layout_tab.update_progress(
-                        cast(int, current),
-                        cast(int, total),
-                        cast(Path, path),
-                    )
-                elif event == "layout_result":
-                    result = cast(TextLayoutResult, payload)
-                    self.layout_tab.show_result(result)
-                    self._show_layout_preview_errors(result)
-                    self._set_busy(False)
-                elif event == "layout_preview_started":
-                    self.layout_tab.show_preview_started(cast(int, payload))
-                elif event == "layout_failure":
-                    self._set_busy(False)
-                    self.layout_tab.show_failure()
-                    messagebox.showerror("Ошибка", str(payload))
-                elif event == "compare_progress":
-                    current, total, path = payload
-                    self.compare_tab.update_progress(
-                        cast(int, current),
-                        cast(int, total),
-                        cast(Path, path),
-                    )
-                elif event == "compare_result":
-                    self.compare_tab.show_result(
-                        cast(LocalisationComparisonResult, payload)
-                    )
-                    self._set_busy(False)
-                elif event == "compare_failure":
-                    self._set_busy(False)
-                    self.compare_tab.show_failure()
-                    messagebox.showerror(
-                        "Ошибка сравнения локализаций",
-                        str(payload),
-                    )
-                elif event == "compare_editor_opened":
-                    self._show_compare_editor_result(
-                        cast(
-                            list[
-                                tuple[
-                                    ComparisonLanguage,
-                                    Diagnostic,
-                                    OpenResult,
-                                ]
-                            ],
-                            payload,
-                        )
-                    )
-                elif event == "compare_editor_failure":
-                    error, opened = cast(
-                        tuple[
-                            Exception,
-                            list[
-                                tuple[
-                                    ComparisonLanguage,
-                                    Diagnostic,
-                                    OpenResult,
-                                ]
-                            ],
-                        ],
-                        payload,
-                    )
-                    self._show_compare_editor_failure(
-                        error,
-                        opened,
-                    )
-                elif event == "editor_opened":
-                    diagnostic, result, status_var = payload
-                    self._show_editor_result(
-                        diagnostic,
-                        result,
-                        status_var,
-                    )
-                elif event == "editor_failure":
-                    messagebox.showerror("Не удалось открыть Notepad++", str(payload))
-        except queue.Empty:
-            pass
+            for event in self.tasks.drain():
+                self._handle_background_event(event)
         finally:
             self.root.after(100, self._poll_events)
+
+    def _handle_background_event(
+        self,
+        event: TaskProgress | TaskNotice | TaskSucceeded | TaskFailed,
+    ) -> None:
+        if isinstance(event, TaskProgress):
+            self._handle_task_progress(event)
+        elif isinstance(event, TaskSucceeded):
+            self._handle_task_success(event)
+        elif isinstance(event, TaskFailed):
+            self._handle_task_failure(event)
+        else:
+            self._handle_task_notice(event)
+
+    def _handle_task_progress(self, event: TaskProgress) -> None:
+        if event.task == "localisation":
+            self.progress.configure(
+                maximum=event.total,
+                value=event.current,
+            )
+            self.current_file_var.set(str(event.path))
+        elif event.task == "layout":
+            self.layout_tab.update_progress(
+                event.current,
+                event.total,
+                event.path,
+            )
+        elif event.task == "comparison":
+            self.compare_tab.update_progress(
+                event.current,
+                event.total,
+                event.path,
+            )
+
+    def _handle_task_success(self, event: TaskSucceeded) -> None:
+        if event.task == "localisation":
+            result, glyph_mode = cast(
+                tuple[ScanResult, GlyphMode],
+                event.result,
+            )
+            self._show_result(result, glyph_mode)
+        elif event.task == "layout":
+            result = cast(TextLayoutResult, event.result)
+            self.layout_tab.show_result(result)
+            self._show_layout_preview_errors(result)
+        elif event.task == "comparison":
+            self.compare_tab.show_result(
+                cast(LocalisationComparisonResult, event.result)
+            )
+        self._set_busy(False)
+
+    def _handle_task_failure(self, event: TaskFailed) -> None:
+        self._set_busy(False)
+        if event.task == "localisation":
+            self.summary_var.set(
+                "Проверка завершилась внутренней ошибкой."
+            )
+            title = "Ошибка"
+        elif event.task == "layout":
+            self.layout_tab.show_failure()
+            title = "Ошибка"
+        else:
+            self.compare_tab.show_failure()
+            title = "Ошибка сравнения локализаций"
+        messagebox.showerror(title, str(event.error))
+
+    def _handle_task_notice(self, event: TaskNotice) -> None:
+        if event.source == "layout" and event.kind == "preview_started":
+            self.layout_tab.show_preview_started(cast(int, event.payload))
+        elif event.source == "compare_editor" and event.kind == "opened":
+            self._show_compare_editor_result(
+                cast(
+                    list[
+                        tuple[
+                            ComparisonLanguage,
+                            Diagnostic,
+                            OpenResult,
+                        ]
+                    ],
+                    event.payload,
+                )
+            )
+        elif event.source == "compare_editor" and event.kind == "failure":
+            error, opened = cast(
+                tuple[
+                    Exception,
+                    list[
+                        tuple[
+                            ComparisonLanguage,
+                            Diagnostic,
+                            OpenResult,
+                        ]
+                    ],
+                ],
+                event.payload,
+            )
+            self._show_compare_editor_failure(error, opened)
+        elif event.source == "editor" and event.kind == "opened":
+            diagnostic, result, status_var = cast(
+                tuple[Diagnostic, OpenResult, tk.StringVar],
+                event.payload,
+            )
+            self._show_editor_result(
+                diagnostic,
+                result,
+                status_var,
+            )
+        elif event.source == "editor" and event.kind == "failure":
+            messagebox.showerror(
+                "Не удалось открыть Notepad++",
+                str(event.payload),
+            )
 
     def _show_result(
         self,
@@ -1479,11 +1479,17 @@ class CheckerApplication:
                     )
                     opened.append((language, diagnostic, result))
             except NotepadPlusPlusError as error:
-                self.events.put(
-                    ("compare_editor_failure", (error, opened))
+                self.tasks.post_notice(
+                    "compare_editor",
+                    "failure",
+                    (error, opened),
                 )
                 return
-            self.events.put(("compare_editor_opened", opened))
+            self.tasks.post_notice(
+                "compare_editor",
+                "opened",
+                opened,
+            )
 
         threading.Thread(target=work, daemon=True).start()
         return "break"
@@ -1799,10 +1805,12 @@ class CheckerApplication:
                     fullscreen=fullscreen,
                 )
             except NotepadPlusPlusError as error:
-                self.events.put(("editor_failure", error))
+                self.tasks.post_notice("editor", "failure", error)
                 return
-            self.events.put(
-                ("editor_opened", (diagnostic, result, status_var))
+            self.tasks.post_notice(
+                "editor",
+                "opened",
+                (diagnostic, result, status_var),
             )
 
         threading.Thread(target=work, daemon=True).start()
