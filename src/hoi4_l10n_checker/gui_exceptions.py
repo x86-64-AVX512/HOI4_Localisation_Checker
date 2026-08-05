@@ -15,7 +15,7 @@ class CharacterExceptionsController:
         self,
         root: tk.Misc,
         characters: Iterable[str],
-        persist: Callable[[], None],
+        persist: Callable[[frozenset[str]], None],
         set_count: Callable[[int], None],
         set_status: Callable[[str], None],
         selected_character: Callable[[], str],
@@ -208,7 +208,7 @@ class CharacterExceptionsController:
 
     def _save(self, previous: set[str]) -> bool:
         try:
-            self._persist()
+            self._persist(self.characters)
         except SettingsError as error:
             self._characters = previous
             self.refresh()

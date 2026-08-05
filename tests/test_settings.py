@@ -10,6 +10,7 @@ from hoi4_l10n_checker.settings import (
     CURRENT_SETTINGS_FORMAT_VERSION,
     AppSettings,
     SettingsError,
+    SettingsStore,
     load_excluded_characters,
     load_settings,
     save_excluded_characters,
@@ -19,6 +20,43 @@ from hoi4_l10n_checker.settings import (
 
 
 class SettingsTests(unittest.TestCase):
+    def test_settings_store_updates_one_snapshot_without_losing_fields(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "settings.json"
+            save_settings(
+                path,
+                AppSettings(
+                    context_mod_path=r"C:\Mods\EaW",
+                    layout_focus_limit=350,
+                ),
+            )
+            store = SettingsStore.load(path)
+
+            updated = store.update(layout_focus_limit=365)
+
+            self.assertIs(updated, store.current)
+            self.assertEqual(365, updated.layout_focus_limit)
+            self.assertEqual(r"C:\Mods\EaW", updated.context_mod_path)
+            self.assertEqual(updated, load_settings(path))
+
+    def test_settings_store_keeps_memory_snapshot_when_save_fails(
+        self,
+    ) -> None:
+        path = Path("settings.json")
+        original = AppSettings(export_directory=r"C:\Old")
+        store = SettingsStore(path, original)
+
+        with patch(
+            "hoi4_l10n_checker.settings.save_settings",
+            side_effect=SettingsError("simulated failure"),
+        ):
+            with self.assertRaisesRegex(SettingsError, "simulated failure"):
+                store.update(export_directory=r"D:\New")
+
+        self.assertIs(original, store.current)
+
     def test_settings_path_is_inside_application_folder(self) -> None:
         app_root = Path("portable") / "LocalisationChecker"
 

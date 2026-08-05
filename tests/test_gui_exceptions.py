@@ -14,6 +14,7 @@ class CharacterExceptionsControllerTests(unittest.TestCase):
         self.root = tk.Tk()
         self.root.withdraw()
         self.persist_count = 0
+        self.persisted_characters: list[frozenset[str]] = []
         self.counts: list[int] = []
         self.statuses: list[str] = []
         self.errors: list[tuple[str, str]] = []
@@ -35,8 +36,9 @@ class CharacterExceptionsControllerTests(unittest.TestCase):
         self.root.update_idletasks()
         self.root.destroy()
 
-    def _persist(self) -> None:
+    def _persist(self, characters: frozenset[str]) -> None:
         self.persist_count += 1
+        self.persisted_characters.append(characters)
 
     def test_character_labels_explain_special_and_printable_symbols(
         self,
@@ -64,6 +66,7 @@ class CharacterExceptionsControllerTests(unittest.TestCase):
         self.assertTrue(added)
         self.assertEqual(frozenset({"—", "…", "«"}), self.controller.characters)
         self.assertEqual(1, self.persist_count)
+        self.assertEqual(self.controller.characters, self.persisted_characters[-1])
         self.assertEqual(3, self.counts[-1])
         self.assertIn("U+00AB, U+2026", self.statuses[-1])
 
@@ -71,7 +74,7 @@ class CharacterExceptionsControllerTests(unittest.TestCase):
         self.assertEqual(1, self.persist_count)
 
     def test_failed_save_restores_previous_characters(self) -> None:
-        def fail() -> None:
+        def fail(_characters: frozenset[str]) -> None:
             raise SettingsError("test failure")
 
         controller = CharacterExceptionsController(

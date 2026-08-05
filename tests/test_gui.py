@@ -16,7 +16,7 @@ from hoi4_l10n_checker.localisation_compare import (
     ComparisonIssue,
     LocalisationComparisonResult,
 )
-from hoi4_l10n_checker.settings import load_settings
+from hoi4_l10n_checker.settings import SettingsError, load_settings
 
 
 class GuiTests(unittest.TestCase):
@@ -102,6 +102,27 @@ class GuiTests(unittest.TestCase):
         )
         self.assertFalse(settings.check_russian_straight_quotes)
         self.assertEqual(2, saved["format_version"])
+
+    def test_failed_setting_update_restores_gui_variable(self) -> None:
+        self.app.check_tab.russian_straight_quotes_var.set(False)
+
+        with (
+            patch.object(
+                self.app.settings,
+                "update",
+                side_effect=SettingsError("simulated failure"),
+            ),
+            patch.object(gui_module.messagebox, "showerror") as showerror,
+        ):
+            self.app._russian_straight_quotes_changed()
+
+        self.assertTrue(
+            self.app.check_tab.russian_straight_quotes_var.get()
+        )
+        self.assertTrue(
+            self.app.settings.current.check_russian_straight_quotes
+        )
+        showerror.assert_called_once()
 
     def test_exception_controller_saves_with_application_settings(self) -> None:
         self.assertTrue(self.app.exceptions.add_text("…«"))

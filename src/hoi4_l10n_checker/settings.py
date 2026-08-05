@@ -271,6 +271,28 @@ def save_settings(
         ) from error
 
 
+class SettingsStore:
+    """Keeps one settings snapshot and commits replacements atomically."""
+
+    def __init__(self, path: Path, current: AppSettings) -> None:
+        self.path = path
+        self._current = current
+
+    @classmethod
+    def load(cls, path: Path) -> SettingsStore:
+        return cls(path, load_settings(path))
+
+    @property
+    def current(self) -> AppSettings:
+        return self._current
+
+    def update(self, **changes: object) -> AppSettings:
+        updated = replace(self._current, **changes)
+        save_settings(self.path, updated)
+        self._current = updated
+        return updated
+
+
 def load_excluded_characters(path: Path) -> frozenset[str]:
     return load_settings(path).excluded_characters
 

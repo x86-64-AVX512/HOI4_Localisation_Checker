@@ -41,8 +41,7 @@ from .localisation_compare import (
 from .settings import (
     AppSettings,
     SettingsError,
-    load_settings,
-    save_settings,
+    SettingsStore,
     settings_path_for,
 )
 from .text_layout_checker import (
@@ -62,46 +61,9 @@ class CheckerApplication:
         self.settings_path = settings_path_for(app_root)
         self.settings_error = ""
         try:
-            settings = load_settings(self.settings_path)
-            excluded_characters = settings.excluded_characters
-            self.notepad_plus_plus_path = settings.notepad_plus_plus_path
-            self.notepad_plus_plus_fullscreen = settings.notepad_plus_plus_fullscreen
-            self.context_mod_path = settings.context_mod_path
-            self.hoi4_install_path = settings.hoi4_install_path
-            self.show_unknown_context_warnings = settings.show_unknown_context_warnings
-            self.check_russian_straight_quotes = settings.check_russian_straight_quotes
-            self.layout_focus_enabled = settings.layout_focus_enabled
-            self.layout_focus_mode = settings.layout_focus_mode
-            self.layout_focus_limit = settings.layout_focus_limit
-            self.layout_focus_preview_cli_path = settings.layout_focus_preview_cli_path
-            self.layout_focus_preview_priority = settings.layout_focus_preview_priority
-            self.layout_events_enabled = settings.layout_events_enabled
-            self.layout_event_limit = settings.layout_event_limit
-            self.layout_welcome_enabled = settings.layout_welcome_enabled
-            self.layout_welcome_limit = settings.layout_welcome_limit
-            self.compare_english_path = settings.compare_english_path
-            self.compare_russian_path = settings.compare_russian_path
-            self.export_directory = settings.export_directory
+            self.settings = SettingsStore.load(self.settings_path)
         except SettingsError as error:
-            excluded_characters = frozenset()
-            self.notepad_plus_plus_path = ""
-            self.notepad_plus_plus_fullscreen = False
-            self.context_mod_path = ""
-            self.hoi4_install_path = ""
-            self.show_unknown_context_warnings = False
-            self.check_russian_straight_quotes = True
-            self.layout_focus_enabled = True
-            self.layout_focus_mode = "length"
-            self.layout_focus_limit = 350
-            self.layout_focus_preview_cli_path = ""
-            self.layout_focus_preview_priority = "auto_ru"
-            self.layout_events_enabled = True
-            self.layout_event_limit = 3400
-            self.layout_welcome_enabled = True
-            self.layout_welcome_limit = 3400
-            self.compare_english_path = ""
-            self.compare_russian_path = ""
-            self.export_directory = ""
+            self.settings = SettingsStore(self.settings_path, AppSettings())
             self.settings_error = str(error)
 
         self.root.title(f"HOI4 Localisation Checker — {DISPLAY_VERSION}")
@@ -123,8 +85,10 @@ class CheckerApplication:
         self.localisation_comparator = LocalisationComparator()
         self.exceptions = CharacterExceptionsController(
             root=self.root,
-            characters=excluded_characters,
-            persist=self._save_current_settings,
+            characters=self.settings.current.excluded_characters,
+            persist=lambda characters: self.settings.update(
+                excluded_characters=characters
+            ),
             set_count=lambda count: self.check_tab.set_exceptions_count(count),
             set_status=lambda status: self.check_tab.set_status(status),
             selected_character=lambda: self.check_tab.selected_character(),
@@ -132,9 +96,13 @@ class CheckerApplication:
         self.editor = NotepadPlusPlusController(
             root=self.root,
             tasks=self.tasks,
-            configured_path=lambda: self.notepad_plus_plus_path,
+            configured_path=(
+                lambda: self.settings.current.notepad_plus_plus_path
+            ),
             remember_executable=self._remember_notepad_plus_plus,
-            fullscreen=lambda: self.notepad_plus_plus_fullscreen,
+            fullscreen=(
+                lambda: self.settings.current.notepad_plus_plus_fullscreen
+            ),
         )
         self._build_ui()
         self.root.after(100, self._poll_events)
@@ -160,6 +128,7 @@ class CheckerApplication:
             )
 
     def _build_ui(self) -> None:
+        settings = self.settings.current
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill=tk.BOTH, expand=True)
         self.check_tab = LocalisationCheckTab(
@@ -167,9 +136,9 @@ class CheckerApplication:
             notebook=self.notebook,
             font_available=self.font_profile is not None,
             font_status=self.font_status,
-            show_unknown_context=self.show_unknown_context_warnings,
-            check_russian_straight_quotes=self.check_russian_straight_quotes,
-            notepad_fullscreen=self.notepad_plus_plus_fullscreen,
+            show_unknown_context=settings.show_unknown_context_warnings,
+            check_russian_straight_quotes=settings.check_russian_straight_quotes,
+            notepad_fullscreen=settings.notepad_plus_plus_fullscreen,
             on_choose_file=self._choose_file,
             on_choose_folder=self._choose_folder,
             on_open_exceptions=self.exceptions.open_dialog,
@@ -189,20 +158,21 @@ class CheckerApplication:
         self._refresh_export_controls()
 
     def _build_layout_tab(self) -> None:
+        settings = self.settings.current
         options = TextLayoutOptions(
-            focus_enabled=self.layout_focus_enabled,
-            focus_mode=self.layout_focus_mode,
-            focus_limit=self.layout_focus_limit,
+            focus_enabled=settings.layout_focus_enabled,
+            focus_mode=settings.layout_focus_mode,
+            focus_limit=settings.layout_focus_limit,
             focus_preview_cli_path=(
-                Path(self.layout_focus_preview_cli_path)
-                if self.layout_focus_preview_cli_path
+                Path(settings.layout_focus_preview_cli_path)
+                if settings.layout_focus_preview_cli_path
                 else None
             ),
-            focus_preview_priority=self.layout_focus_preview_priority,
-            events_enabled=self.layout_events_enabled,
-            event_limit=self.layout_event_limit,
-            welcome_enabled=self.layout_welcome_enabled,
-            welcome_limit=self.layout_welcome_limit,
+            focus_preview_priority=settings.layout_focus_preview_priority,
+            events_enabled=settings.layout_events_enabled,
+            event_limit=settings.layout_event_limit,
+            welcome_enabled=settings.layout_welcome_enabled,
+            welcome_limit=settings.layout_welcome_limit,
         )
         self.layout_tab = TextLayoutTab(
             root=self.root,
@@ -265,12 +235,13 @@ class CheckerApplication:
             self._start_layout_scan(Path(selected))
 
     def _refresh_focus_preview_ui(self) -> None:
-        if not self.layout_focus_preview_cli_path:
+        cli_path = self.settings.current.layout_focus_preview_cli_path
+        if not cli_path:
             self.layout_tab.set_preview_cli_status(
                 "не выбран — точная проверка заблокирована"
             )
             return
-        path = Path(self.layout_focus_preview_cli_path)
+        path = Path(cli_path)
         try:
             resolved = validate_focus_preview_installation(path)
         except FocusPreviewError as error:
@@ -279,10 +250,9 @@ class CheckerApplication:
         self.layout_tab.set_preview_cli_status(str(resolved))
 
     def _select_focus_preview_cli(self) -> Path | None:
+        cli_path = self.settings.current.layout_focus_preview_cli_path
         current = (
-            Path(self.layout_focus_preview_cli_path)
-            if self.layout_focus_preview_cli_path
-            else None
+            Path(cli_path) if cli_path else None
         )
         options: dict[str, object] = {
             "parent": self.root,
@@ -310,12 +280,11 @@ class CheckerApplication:
             )
             return None
 
-        previous = self.layout_focus_preview_cli_path
-        self.layout_focus_preview_cli_path = str(executable)
         try:
-            self._save_current_settings()
+            self.settings.update(
+                layout_focus_preview_cli_path=str(executable)
+            )
         except SettingsError as error:
-            self.layout_focus_preview_cli_path = previous
             messagebox.showerror(
                 "Путь к EaW Focus Text Preview не сохранён",
                 str(error),
@@ -327,10 +296,11 @@ class CheckerApplication:
         return executable
 
     def _require_focus_preview_cli(self) -> Path | None:
-        if self.layout_focus_preview_cli_path:
+        cli_path = self.settings.current.layout_focus_preview_cli_path
+        if cli_path:
             try:
                 return validate_focus_preview_installation(
-                    Path(self.layout_focus_preview_cli_path)
+                    Path(cli_path)
                 )
             except FocusPreviewError as error:
                 messagebox.showwarning(
@@ -350,9 +320,10 @@ class CheckerApplication:
 
     def _refresh_compare_paths_ui(self) -> None:
         if hasattr(self, "compare_tab"):
+            settings = self.settings.current
             self.compare_tab.set_paths(
-                self.compare_english_path,
-                self.compare_russian_path,
+                settings.compare_english_path,
+                settings.compare_russian_path,
             )
 
     def _select_compare_folder(self, language: str) -> Path | None:
@@ -361,7 +332,7 @@ class CheckerApplication:
         attribute = (
             "compare_english_path" if language == "english" else "compare_russian_path"
         )
-        current_value = getattr(self, attribute)
+        current_value = getattr(self.settings.current, attribute)
         current = Path(current_value) if current_value else None
         options: dict[str, object] = {
             "parent": self.root,
@@ -378,12 +349,9 @@ class CheckerApplication:
         if not selected:
             return None
         path = Path(selected).resolve()
-        previous = current_value
-        setattr(self, attribute, str(path))
         try:
-            self._save_current_settings()
+            self.settings.update(**{attribute: str(path)})
         except SettingsError as error:
-            setattr(self, attribute, previous)
             self._refresh_compare_paths_ui()
             messagebox.showerror(
                 "Папка сравнения не сохранена",
@@ -397,7 +365,12 @@ class CheckerApplication:
     def _require_compare_folders(
         self,
     ) -> tuple[Path, Path] | None:
-        english = Path(self.compare_english_path) if self.compare_english_path else None
+        settings = self.settings.current
+        english = (
+            Path(settings.compare_english_path)
+            if settings.compare_english_path
+            else None
+        )
         if english is None or not english.is_dir():
             messagebox.showwarning(
                 "Нужна английская папка",
@@ -407,7 +380,8 @@ class CheckerApplication:
             if english is None:
                 return None
 
-        russian = Path(self.compare_russian_path) if self.compare_russian_path else None
+        russian_path = self.settings.current.compare_russian_path
+        russian = Path(russian_path) if russian_path else None
         if russian is None or not russian.is_dir():
             messagebox.showwarning(
                 "Нужна русская папка",
@@ -419,33 +393,47 @@ class CheckerApplication:
         return english.resolve(), russian.resolve()
 
     def _capture_layout_settings(self) -> TextLayoutOptions:
-        options = self.layout_tab.capture_options(self.layout_focus_preview_cli_path)
-        self.layout_focus_enabled = options.focus_enabled
-        self.layout_focus_mode = options.focus_mode
-        self.layout_focus_limit = options.focus_limit
-        self.layout_focus_preview_priority = options.focus_preview_priority
-        self.layout_events_enabled = options.events_enabled
-        self.layout_event_limit = options.event_limit
-        self.layout_welcome_enabled = options.welcome_enabled
-        self.layout_welcome_limit = options.welcome_limit
-        return options
+        return self.layout_tab.capture_options(
+            self.settings.current.layout_focus_preview_cli_path
+        )
+
+    def _store_layout_settings(
+        self,
+        options: TextLayoutOptions,
+    ) -> None:
+        self.settings.update(
+            layout_focus_enabled=options.focus_enabled,
+            layout_focus_mode=options.focus_mode,
+            layout_focus_limit=options.focus_limit,
+            layout_focus_preview_cli_path=(
+                str(options.focus_preview_cli_path)
+                if options.focus_preview_cli_path is not None
+                else ""
+            ),
+            layout_focus_preview_priority=(options.focus_preview_priority),
+            layout_events_enabled=options.events_enabled,
+            layout_event_limit=options.event_limit,
+            layout_welcome_enabled=options.welcome_enabled,
+            layout_welcome_limit=options.welcome_limit,
+        )
 
     def _restore_layout_variables(self) -> None:
+        settings = self.settings.current
         self.layout_tab.restore_options(
             TextLayoutOptions(
-                focus_enabled=self.layout_focus_enabled,
-                focus_mode=self.layout_focus_mode,
-                focus_limit=self.layout_focus_limit,
+                focus_enabled=settings.layout_focus_enabled,
+                focus_mode=settings.layout_focus_mode,
+                focus_limit=settings.layout_focus_limit,
                 focus_preview_cli_path=(
-                    Path(self.layout_focus_preview_cli_path)
-                    if self.layout_focus_preview_cli_path
+                    Path(settings.layout_focus_preview_cli_path)
+                    if settings.layout_focus_preview_cli_path
                     else None
                 ),
-                focus_preview_priority=self.layout_focus_preview_priority,
-                events_enabled=self.layout_events_enabled,
-                event_limit=self.layout_event_limit,
-                welcome_enabled=self.layout_welcome_enabled,
-                welcome_limit=self.layout_welcome_limit,
+                focus_preview_priority=settings.layout_focus_preview_priority,
+                events_enabled=settings.layout_events_enabled,
+                event_limit=settings.layout_event_limit,
+                welcome_enabled=settings.layout_welcome_enabled,
+                welcome_limit=settings.layout_welcome_limit,
             )
         )
 
@@ -453,32 +441,9 @@ class CheckerApplication:
         self,
         _event: object | None = None,
     ) -> str:
-        previous = (
-            self.layout_focus_enabled,
-            self.layout_focus_mode,
-            self.layout_focus_limit,
-            self.layout_focus_preview_cli_path,
-            self.layout_focus_preview_priority,
-            self.layout_events_enabled,
-            self.layout_event_limit,
-            self.layout_welcome_enabled,
-            self.layout_welcome_limit,
-        )
         try:
-            self._capture_layout_settings()
-            self._save_current_settings()
+            self._store_layout_settings(self._capture_layout_settings())
         except (ValueError, SettingsError) as error:
-            (
-                self.layout_focus_enabled,
-                self.layout_focus_mode,
-                self.layout_focus_limit,
-                self.layout_focus_preview_cli_path,
-                self.layout_focus_preview_priority,
-                self.layout_events_enabled,
-                self.layout_event_limit,
-                self.layout_welcome_enabled,
-                self.layout_welcome_limit,
-            ) = previous
             self._restore_layout_variables()
             self._refresh_focus_preview_ui()
             self._refresh_layout_controls()
@@ -499,7 +464,8 @@ class CheckerApplication:
             self.compare_tab.set_busy(self.busy)
 
     def _refresh_context_mod_ui(self) -> None:
-        if not self.context_mod_path:
+        context_mod_path = self.settings.current.context_mod_path
+        if not context_mod_path:
             self.check_tab.set_context_status(
                 "не указана — контекстный режим заблокирован"
             )
@@ -508,7 +474,7 @@ class CheckerApplication:
                     "не указана — проверка текстов заблокирована"
                 )
             return
-        path = Path(self.context_mod_path)
+        path = Path(context_mod_path)
         if not path.is_dir() or not is_context_root(path):
             message = f"путь недоступен или не является папкой мода: {path}"
             self.check_tab.set_context_status(message)
@@ -524,7 +490,8 @@ class CheckerApplication:
         self,
         initial_dir: Path | None = None,
     ) -> Path | None:
-        current = Path(self.context_mod_path) if self.context_mod_path else None
+        context_mod_path = self.settings.current.context_mod_path
+        current = Path(context_mod_path) if context_mod_path else None
         starting_directory = initial_dir
         if starting_directory is None and current is not None and current.is_dir():
             starting_directory = current
@@ -552,12 +519,9 @@ class CheckerApplication:
             )
             return None
 
-        previous = self.context_mod_path
-        self.context_mod_path = str(path)
         try:
-            self._save_current_settings()
+            self.settings.update(context_mod_path=str(path))
         except SettingsError as error:
-            self.context_mod_path = previous
             self._refresh_context_mod_ui()
             messagebox.showerror(
                 "Папка мода не сохранена",
@@ -579,7 +543,8 @@ class CheckerApplication:
         purpose: str = "Контекстный жёсткий режим",
     ) -> Path | None:
         while True:
-            configured = Path(self.context_mod_path) if self.context_mod_path else None
+            context_mod_path = self.settings.current.context_mod_path
+            configured = Path(context_mod_path) if context_mod_path else None
             if (
                 configured is None
                 or not configured.is_dir()
@@ -615,18 +580,16 @@ class CheckerApplication:
             return configured
 
     def _resolve_hoi4_install(self) -> Path | None:
-        game_root = find_hoi4_install(self.hoi4_install_path)
+        install_path = self.settings.current.hoi4_install_path
+        game_root = find_hoi4_install(install_path)
         if game_root is None:
             return None
-        if str(game_root) == self.hoi4_install_path:
+        if str(game_root) == install_path:
             return game_root
 
-        previous = self.hoi4_install_path
-        self.hoi4_install_path = str(game_root)
         try:
-            self._save_current_settings()
+            self.settings.update(hoi4_install_path=str(game_root))
         except SettingsError as error:
-            self.hoi4_install_path = previous
             messagebox.showwarning(
                 "Путь к Hearts of Iron IV не сохранён",
                 str(error),
@@ -688,8 +651,9 @@ class CheckerApplication:
             context_game_root = self._resolve_hoi4_install()
 
         excluded_characters = self.exceptions.characters
-        show_unknown_context_warnings = self.show_unknown_context_warnings
-        check_russian_straight_quotes = self.check_russian_straight_quotes
+        settings = self.settings.current
+        show_unknown_context_warnings = settings.show_unknown_context_warnings
+        check_russian_straight_quotes = settings.check_russian_straight_quotes
         if glyph_mode == "contextual":
             game_note = (
                 f"; HOI4: {context_game_root}"
@@ -721,17 +685,6 @@ class CheckerApplication:
         if self.tasks.is_running:
             return
 
-        previous = (
-            self.layout_focus_enabled,
-            self.layout_focus_mode,
-            self.layout_focus_limit,
-            self.layout_focus_preview_cli_path,
-            self.layout_focus_preview_priority,
-            self.layout_events_enabled,
-            self.layout_event_limit,
-            self.layout_welcome_enabled,
-            self.layout_welcome_limit,
-        )
         try:
             options = self._capture_layout_settings()
             if options.focus_enabled and options.focus_mode == "exact":
@@ -741,25 +694,13 @@ class CheckerApplication:
                         "Точная проверка отменена: CLI не указан."
                     )
                     return
-                self.layout_focus_preview_cli_path = str(preview_cli)
                 options = replace(
                     options,
                     focus_preview_cli_path=preview_cli,
                 )
             options.validate()
-            self._save_current_settings()
+            self._store_layout_settings(options)
         except (ValueError, SettingsError) as error:
-            (
-                self.layout_focus_enabled,
-                self.layout_focus_mode,
-                self.layout_focus_limit,
-                self.layout_focus_preview_cli_path,
-                self.layout_focus_preview_priority,
-                self.layout_events_enabled,
-                self.layout_event_limit,
-                self.layout_welcome_enabled,
-                self.layout_welcome_limit,
-            ) = previous
             self._restore_layout_variables()
             self._refresh_focus_preview_ui()
             self._refresh_layout_controls()
@@ -903,32 +844,6 @@ class CheckerApplication:
             self.compare_tab.status_var,
         )
 
-    def _save_current_settings(self) -> None:
-        save_settings(
-            self.settings_path,
-            AppSettings(
-                excluded_characters=self.exceptions.characters,
-                notepad_plus_plus_path=self.notepad_plus_plus_path,
-                notepad_plus_plus_fullscreen=self.notepad_plus_plus_fullscreen,
-                context_mod_path=self.context_mod_path,
-                hoi4_install_path=self.hoi4_install_path,
-                show_unknown_context_warnings=(self.show_unknown_context_warnings),
-                check_russian_straight_quotes=(self.check_russian_straight_quotes),
-                layout_focus_enabled=self.layout_focus_enabled,
-                layout_focus_mode=self.layout_focus_mode,
-                layout_focus_limit=self.layout_focus_limit,
-                layout_focus_preview_cli_path=(self.layout_focus_preview_cli_path),
-                layout_focus_preview_priority=(self.layout_focus_preview_priority),
-                layout_events_enabled=self.layout_events_enabled,
-                layout_event_limit=self.layout_event_limit,
-                layout_welcome_enabled=self.layout_welcome_enabled,
-                layout_welcome_limit=self.layout_welcome_limit,
-                compare_english_path=self.compare_english_path,
-                compare_russian_path=self.compare_russian_path,
-                export_directory=self.export_directory,
-            ),
-        )
-
     def _export_table_results(
         self,
         table: ttk.Treeview,
@@ -940,7 +855,7 @@ class CheckerApplication:
             self.root.bell()
             return
 
-        initial_directory = Path(self.export_directory)
+        initial_directory = Path(self.settings.current.export_directory)
         if not initial_directory.is_dir():
             initial_directory = self.app_root
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -970,12 +885,9 @@ class CheckerApplication:
             )
             return
 
-        previous_directory = self.export_directory
-        self.export_directory = str(path.parent)
         try:
-            self._save_current_settings()
+            self.settings.update(export_directory=str(path.parent))
         except SettingsError as error:
-            self.export_directory = previous_directory
             messagebox.showwarning(
                 "Папка выгрузки не запомнена",
                 f"CSV сохранён, но настройку сохранить не удалось:\n{error}",
@@ -983,14 +895,11 @@ class CheckerApplication:
         status_var.set(f"Выгружено строк: {row_count}; файл: {path}")
 
     def _unknown_context_visibility_changed(self) -> None:
-        previous = self.show_unknown_context_warnings
-        self.show_unknown_context_warnings = (
-            self.check_tab.show_unknown_context_var.get()
-        )
+        previous = self.settings.current.show_unknown_context_warnings
+        enabled = self.check_tab.show_unknown_context_var.get()
         try:
-            self._save_current_settings()
+            self.settings.update(show_unknown_context_warnings=enabled)
         except SettingsError as error:
-            self.show_unknown_context_warnings = previous
             self.check_tab.show_unknown_context_var.set(previous)
             messagebox.showerror(
                 "Настройка контекстных предупреждений не сохранена",
@@ -999,38 +908,34 @@ class CheckerApplication:
             return
         state = (
             "будут показаны отдельным предупреждением"
-            if self.show_unknown_context_warnings
+            if enabled
             else "будут скрыты"
         )
         self.check_tab.set_status(f"Ключи с неопределённым контекстом {state}.")
 
     def _russian_straight_quotes_changed(self) -> None:
-        previous = self.check_russian_straight_quotes
-        self.check_russian_straight_quotes = (
-            self.check_tab.russian_straight_quotes_var.get()
-        )
+        previous = self.settings.current.check_russian_straight_quotes
+        enabled = self.check_tab.russian_straight_quotes_var.get()
         try:
-            self._save_current_settings()
+            self.settings.update(check_russian_straight_quotes=enabled)
         except SettingsError as error:
-            self.check_russian_straight_quotes = previous
             self.check_tab.russian_straight_quotes_var.set(previous)
             messagebox.showerror(
                 "Настройка проверки кавычек не сохранена",
                 str(error),
             )
             return
-        state = "включена" if self.check_russian_straight_quotes else "выключена"
+        state = "включена" if enabled else "выключена"
         self.check_tab.set_status(
             f"Проверка прямых кавычек в русской локализации {state}."
         )
 
     def _notepad_window_mode_changed(self) -> None:
-        previous = self.notepad_plus_plus_fullscreen
-        self.notepad_plus_plus_fullscreen = self.check_tab.notepad_fullscreen_var.get()
+        previous = self.settings.current.notepad_plus_plus_fullscreen
+        fullscreen = self.check_tab.notepad_fullscreen_var.get()
         try:
-            self._save_current_settings()
+            self.settings.update(notepad_plus_plus_fullscreen=fullscreen)
         except SettingsError as error:
-            self.notepad_plus_plus_fullscreen = previous
             self.check_tab.notepad_fullscreen_var.set(previous)
             messagebox.showerror(
                 "Режим окна Notepad++ не сохранён",
@@ -1039,22 +944,20 @@ class CheckerApplication:
             return
         mode = (
             "в полноэкранном режиме"
-            if self.notepad_plus_plus_fullscreen
+            if fullscreen
             else "в обычном окне"
         )
         self.check_tab.set_status(f"Notepad++ будет открываться {mode}.")
 
     def _remember_notepad_plus_plus(self, executable: Path) -> None:
-        previous = self.notepad_plus_plus_path
-        self.notepad_plus_plus_path = str(executable)
         try:
-            self._save_current_settings()
+            self.settings.update(notepad_plus_plus_path=str(executable))
         except SettingsError as error:
-            self.notepad_plus_plus_path = previous
             messagebox.showwarning(
                 "Путь к Notepad++ не сохранён",
                 str(error),
             )
+
 
 def run_gui(app_root: Path) -> None:
     root = tk.Tk()
