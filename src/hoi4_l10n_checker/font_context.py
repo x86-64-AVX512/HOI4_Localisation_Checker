@@ -1,25 +1,67 @@
 from __future__ import annotations
 
-import os
 import re
-import sys
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Iterator, Mapping
 
-_GUI_TOKEN = re.compile(
-    r'"(?:\\.|[^"\\])*"|#[^\r\n]*|[{}=]|[^\s{}="#]+'
+from .font_context_paths import (
+    effective_data_files as _effective_data_files,
 )
-_MOD_NAME = re.compile(r'^\s*name\s*=\s*"([^"]+)"', re.MULTILINE)
-_REPLACE_PATH = re.compile(
-    r'^\s*replace_path\s*=\s*"([^"]+)"',
-    re.MULTILINE,
+from .font_context_paths import (
+    effective_gui_files as _effective_gui_files,
 )
-_STEAM_PATH = re.compile(r'"path"\s*"((?:\\.|[^"])*)"')
-_STEAM_INSTALL_DIR = re.compile(r'"installdir"\s*"((?:\\.|[^"])*)"')
-_LOCALISATION_EXPRESSION = re.compile(r"\[([^\]\r\n]+)\]")
-_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+from .font_context_paths import (
+    find_hoi4_install,
+    find_mod_root,
+    is_context_root,
+    mod_display_name,
+)
+from .paradox_script import (
+    ParsedBlock as _ParsedBlock,
+)
+from .paradox_script import (
+    ancestor_names as _ancestor_names,
+)
+from .paradox_script import (
+    block_name as _block_name,
+)
+from .paradox_script import (
+    font_names as _font_names,
+)
+from .paradox_script import (
+    has_ancestor_kind as _has_ancestor_kind,
+)
+from .paradox_script import (
+    localisation_calls as _localisation_calls,
+)
+from .paradox_script import (
+    parse_blocks as _parse_blocks,
+)
+from .paradox_script import (
+    property_line as _property_line,
+)
+from .paradox_script import (
+    token_value as _token_value,
+)
+from .paradox_script import (
+    tokenize_script as _tokenize_script,
+)
+
+__all__ = [
+    "FontContextIndex",
+    "ROLE_EVENT_DESCRIPTION",
+    "ROLE_FOCUS_DESCRIPTION",
+    "ROLE_WELCOME_TEXT",
+    "RoleEvidence",
+    "build_font_context",
+    "find_hoi4_install",
+    "find_mod_root",
+    "is_context_root",
+    "mod_display_name",
+]
+
 _PARTY_KEY = re.compile(r"(?:^|_)party(?:_|$)", re.IGNORECASE)
 _CHARACTER_ROLE_BLOCKS = frozenset(
     {
@@ -166,334 +208,6 @@ class FontContextIndex:
         return len(self.semantic_keys)
 
 
-@dataclass(slots=True)
-class _ParsedBlock:
-    kind: str
-    parent: _ParsedBlock | None
-    properties: dict[str, list[str]]
-    property_lines: dict[str, list[int]]
-    source_path: Path | None
-    line: int
-
-
-def is_context_root(path: Path) -> bool:
-    path = path.resolve()
-    return (
-        (path / "descriptor.mod").is_file()
-        or (path / "interface").is_dir()
-        and (path / "localisation").is_dir()
-    )
-
-
-def find_mod_root(target: Path) -> Path | None:
-    target = target.resolve()
-    current = target.parent if target.is_file() else target
-    for candidate in (current, *current.parents):
-        if is_context_root(candidate):
-            return candidate
-    return None
-
-
-def mod_display_name(mod_root: Path) -> str:
-    descriptor = mod_root / "descriptor.mod"
-    if not descriptor.is_file():
-        return mod_root.name
-    try:
-        text = descriptor.read_text(encoding="utf-8-sig", errors="replace")
-    except OSError:
-        return mod_root.name
-    match = _MOD_NAME.search(text)
-    return match.group(1).strip() if match else mod_root.name
-
-
-def _decode_steam_value(value: str) -> str:
-    return value.replace(r"\\", "\\")
-
-
-def _steam_registry_roots() -> list[Path]:
-    if sys.platform != "win32":
-        return []
-
-    import winreg
-
-    locations = (
-        (winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam", "SteamPath"),
-        (winreg.HKEY_LOCAL_MACHINE, r"Software\Valve\Steam", "InstallPath"),
-        (
-            winreg.HKEY_LOCAL_MACHINE,
-            r"Software\WOW6432Node\Valve\Steam",
-            "InstallPath",
-        ),
-    )
-    roots: list[Path] = []
-    for hive, subkey, value_name in locations:
-        try:
-            with winreg.OpenKey(hive, subkey) as key:
-                value, _ = winreg.QueryValueEx(key, value_name)
-        except OSError:
-            continue
-        if isinstance(value, str) and value:
-            roots.append(Path(value))
-    return roots
-
-
-def _steam_library_roots(steam_root: Path) -> list[Path]:
-    roots = [steam_root]
-    library_file = steam_root / "steamapps" / "libraryfolders.vdf"
-    if not library_file.is_file():
-        return roots
-    try:
-        text = library_file.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return roots
-    roots.extend(
-        Path(_decode_steam_value(match.group(1)))
-        for match in _STEAM_PATH.finditer(text)
-    )
-    return roots
-
-
-def _game_candidate(library_root: Path) -> Path:
-    steamapps = library_root / "steamapps"
-    manifest = steamapps / "appmanifest_394360.acf"
-    install_dir = "Hearts of Iron IV"
-    if manifest.is_file():
-        try:
-            text = manifest.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            text = ""
-        match = _STEAM_INSTALL_DIR.search(text)
-        if match:
-            install_dir = _decode_steam_value(match.group(1))
-    return steamapps / "common" / install_dir
-
-
-def _valid_game_root(path: Path) -> bool:
-    return (path / "interface").is_dir() and (
-        (path / "hoi4.exe").is_file()
-        or (path / "localisation").is_dir()
-    )
-
-
-def find_hoi4_install(configured_path: str = "") -> Path | None:
-    direct_candidates: list[Path] = []
-    if configured_path:
-        direct_candidates.append(Path(configured_path))
-
-    for environment_name in ("ProgramFiles(x86)", "ProgramFiles"):
-        base = os.environ.get(environment_name)
-        if base:
-            direct_candidates.append(
-                Path(base) / "Steam" / "steamapps" / "common" / "Hearts of Iron IV"
-            )
-
-    steam_roots = _steam_registry_roots()
-    for environment_name in ("ProgramFiles(x86)", "ProgramFiles"):
-        base = os.environ.get(environment_name)
-        if base:
-            steam_roots.append(Path(base) / "Steam")
-
-    for steam_root in steam_roots:
-        for library_root in _steam_library_roots(steam_root):
-            direct_candidates.append(_game_candidate(library_root))
-
-    seen: set[str] = set()
-    for candidate in direct_candidates:
-        try:
-            resolved = candidate.resolve()
-        except OSError:
-            continue
-        normalized = str(resolved).casefold()
-        if normalized in seen:
-            continue
-        seen.add(normalized)
-        if _valid_game_root(resolved):
-            return resolved
-    return None
-
-
-def _descriptor_replace_paths(mod_root: Path) -> tuple[str, ...]:
-    descriptor = mod_root / "descriptor.mod"
-    if not descriptor.is_file():
-        return ()
-    try:
-        text = descriptor.read_text(encoding="utf-8-sig", errors="replace")
-    except OSError:
-        return ()
-    return tuple(
-        match.group(1).replace("\\", "/").strip("/").casefold()
-        for match in _REPLACE_PATH.finditer(text)
-    )
-
-
-def _gui_files(root: Path) -> dict[str, Path]:
-    interface_root = root / "interface"
-    if not interface_root.is_dir():
-        return {}
-    return {
-        path.relative_to(interface_root).as_posix().casefold(): path
-        for path in interface_root.rglob("*.gui")
-        if path.is_file()
-    }
-
-
-def _effective_gui_files(
-    mod_root: Path,
-    game_root: Path | None,
-) -> list[Path]:
-    files: dict[str, Path] = {}
-    if game_root is not None and game_root.resolve() != mod_root.resolve():
-        files.update(_gui_files(game_root))
-
-    for replace_path in _descriptor_replace_paths(mod_root):
-        if replace_path == "interface":
-            files.clear()
-            break
-        if not replace_path.startswith("interface/"):
-            continue
-        prefix = replace_path[len("interface/") :]
-        files = {
-            relative: path
-            for relative, path in files.items()
-            if relative != prefix and not relative.startswith(prefix + "/")
-        }
-    files.update(_gui_files(mod_root))
-    return [files[key] for key in sorted(files)]
-
-
-def _data_files(root: Path, relative_root: str) -> dict[str, Path]:
-    data_root = root.joinpath(*relative_root.split("/"))
-    if not data_root.is_dir():
-        return {}
-    return {
-        path.relative_to(data_root).as_posix().casefold(): path
-        for path in data_root.rglob("*.txt")
-        if path.is_file()
-    }
-
-
-def _effective_data_files(
-    mod_root: Path,
-    game_root: Path | None,
-    relative_root: str,
-) -> list[Path]:
-    normalized_root = relative_root.strip("/").casefold()
-    files: dict[str, Path] = {}
-    if game_root is not None and game_root.resolve() != mod_root.resolve():
-        files.update(_data_files(game_root, normalized_root))
-
-    for replace_path in _descriptor_replace_paths(mod_root):
-        if replace_path == normalized_root:
-            files.clear()
-            break
-        if not replace_path.startswith(normalized_root + "/"):
-            continue
-        prefix = replace_path[len(normalized_root) + 1 :]
-        files = {
-            relative: path
-            for relative, path in files.items()
-            if relative != prefix and not relative.startswith(prefix + "/")
-        }
-
-    files.update(_data_files(mod_root, normalized_root))
-    return [files[key] for key in sorted(files)]
-
-
-def _tokenize_script(text: str) -> list[str]:
-    return [token for token, _ in _tokenize_script_with_lines(text)]
-
-
-def _tokenize_script_with_lines(text: str) -> list[tuple[str, int]]:
-    result: list[tuple[str, int]] = []
-    line = 1
-    previous_end = 0
-    for match in _GUI_TOKEN.finditer(text):
-        line += text.count("\n", previous_end, match.start())
-        previous_end = match.end()
-        token = match.group(0)
-        if not token.startswith("#"):
-            result.append((token, line))
-    return result
-
-
-def _token_value(token: str) -> str:
-    if len(token) >= 2 and token.startswith('"') and token.endswith('"'):
-        return token[1:-1].replace(r"\"", '"').replace(r"\\", "\\")
-    return token
-
-
-def _parse_blocks(
-    text: str,
-    source_path: Path | None = None,
-) -> list[_ParsedBlock]:
-    token_items = _tokenize_script_with_lines(text)
-    tokens = [token for token, _ in token_items]
-    token_lines = [line for _, line in token_items]
-    blocks: list[_ParsedBlock] = []
-    stack: list[_ParsedBlock] = []
-    index = 0
-
-    while index < len(tokens):
-        token = tokens[index]
-        if (
-            index + 2 < len(tokens)
-            and tokens[index + 1] == "="
-            and tokens[index + 2] == "{"
-        ):
-            block = _ParsedBlock(
-                kind=_token_value(token),
-                parent=stack[-1] if stack else None,
-                properties=defaultdict(list),
-                property_lines=defaultdict(list),
-                source_path=source_path,
-                line=token_lines[index],
-            )
-            blocks.append(block)
-            stack.append(block)
-            index += 3
-            continue
-        if token == "}":
-            if stack:
-                stack.pop()
-            index += 1
-            continue
-        if (
-            stack
-            and index + 2 < len(tokens)
-            and tokens[index + 1] == "="
-            and tokens[index + 2] != "{"
-        ):
-            stack[-1].properties[token.casefold()].append(
-                _token_value(tokens[index + 2])
-            )
-            stack[-1].property_lines[token.casefold()].append(
-                token_lines[index]
-            )
-            index += 3
-            continue
-        index += 1
-    return blocks
-
-
-def _block_name(block: _ParsedBlock) -> str:
-    names = block.properties.get("name", [])
-    return names[0] if names else ""
-
-
-def _property_line(
-    block: _ParsedBlock,
-    property_name: str,
-    value: str,
-) -> int:
-    normalized = property_name.casefold()
-    values = block.properties.get(normalized, [])
-    lines = block.property_lines.get(normalized, [])
-    for index, candidate in enumerate(values):
-        if candidate == value and index < len(lines):
-            return lines[index]
-    return block.line
-
-
 def _record_role_evidence(
     destination: dict[tuple[str, str], set[RoleEvidence]],
     key: str,
@@ -522,46 +236,6 @@ def _record_role_evidence(
             rule=rule,
         )
     )
-
-
-def _ancestor_names(block: _ParsedBlock) -> Iterator[str]:
-    parent = block.parent
-    while parent is not None:
-        name = _block_name(parent)
-        if name:
-            yield name.casefold()
-        parent = parent.parent
-
-
-def _has_ancestor_kind(block: _ParsedBlock, kinds: frozenset[str]) -> bool:
-    parent = block.parent
-    while parent is not None:
-        if parent.kind.casefold() in kinds:
-            return True
-        parent = parent.parent
-    return False
-
-
-def _font_names(block: _ParsedBlock) -> set[str]:
-    return {
-        font
-        for property_name in ("font", "buttonfont")
-        for font in block.properties.get(property_name, [])
-        if font
-    }
-
-
-def _localisation_calls(value: str) -> set[str]:
-    calls: set[str] = set()
-    for match in _LOCALISATION_EXPRESSION.finditer(value):
-        expression = match.group(1).split("|", 1)[0].strip()
-        if not expression or expression[0] in {"?", "@"}:
-            continue
-        candidate = expression.rsplit(".", 1)[-1]
-        candidate = candidate.split("(", 1)[0].strip()
-        if _IDENTIFIER.fullmatch(candidate):
-            calls.add(candidate)
-    return calls
 
 
 def _index_gui_blocks(
@@ -605,13 +279,11 @@ def _index_gui_blocks(
         name = _block_name(block).casefold()
         ancestors = frozenset(_ancestor_names(block))
         welcome_context = any(
-            "welcome_screen" in candidate
-            or "_ws_" in f"_{candidate}_"
+            "welcome_screen" in candidate or "_ws_" in f"_{candidate}_"
             for candidate in ancestors
         )
         welcome_body = (
-            welcome_context
-            and re.fullmatch(r"tab_\d+_text", name) is not None
+            welcome_context and re.fullmatch(r"tab_\d+_text", name) is not None
         )
 
         if welcome_body:
@@ -634,9 +306,7 @@ def _index_gui_blocks(
                             property_value=text,
                         )
                     for function_name in _localisation_calls(text):
-                        dynamic_function_roles[function_name].add(
-                            ROLE_WELCOME_TEXT
-                        )
+                        dynamic_function_roles[function_name].add(ROLE_WELCOME_TEXT)
 
         if fonts:
             for property_name in _DIRECT_TEXT_PROPERTIES:
@@ -662,16 +332,10 @@ def _index_gui_blocks(
             for property_name in _DIRECT_TEXT_PROPERTIES
             for value in block.properties.get(property_name, [])
         }
-        if (
-            name == "operation_name"
-            and "battleplantools_window" in ancestors
-        ):
+        if name == "operation_name" and "battleplantools_window" in ancestors:
             role_fonts[_ROLE_BATTLEPLAN_NAME].update(fonts)
-        if (
-            name == "text"
-            and ancestors.intersection(
-                {"victory_point_mapicon", "capital_mapicon"}
-            )
+        if name == "text" and ancestors.intersection(
+            {"victory_point_mapicon", "capital_mapicon"}
         ):
             role_fonts[_ROLE_VICTORY_POINT_NAME].update(fonts)
         if name == "party_name" or "party name" in text_values:
@@ -701,15 +365,23 @@ def _index_gui_blocks(
             "eventwindow" in ancestor or "event_window" in ancestor
             for ancestor in ancestors
         )
-        if character_context and not event_context and (
-            name == "name"
-            or name.endswith("_name")
-            or any("name" in value for value in text_values)
+        if (
+            character_context
+            and not event_context
+            and (
+                name == "name"
+                or name.endswith("_name")
+                or any("name" in value for value in text_values)
+            )
         ):
             role_fonts[_ROLE_CHARACTER_NAME].update(fonts)
-        if character_context and not event_context and (
-            name in {"desc", "description"}
-            or name.endswith(("_desc", "_description"))
+        if (
+            character_context
+            and not event_context
+            and (
+                name in {"desc", "description"}
+                or name.endswith(("_desc", "_description"))
+            )
         ):
             role_fonts[_ROLE_CHARACTER_DESCRIPTION].update(fonts)
 
@@ -727,9 +399,7 @@ def _index_gui_blocks(
 
         if name == "name" and ancestors.intersection(focus_name_templates):
             role_fonts[_ROLE_FOCUS_NAME].update(fonts)
-        if name == "desc" and ancestors.intersection(
-            focus_description_templates
-        ):
+        if name == "desc" and ancestors.intersection(focus_description_templates):
             role_fonts[_ROLE_FOCUS_DESCRIPTION].update(fonts)
 
         if name == "name" and any(
@@ -892,8 +562,7 @@ def _equipment_name_role(
     if block is not None:
         for property_name in ("archetype", "type"):
             hints.extend(
-                value.casefold()
-                for value in block.properties.get(property_name, [])
+                value.casefold() for value in block.properties.get(property_name, [])
             )
     combined = " ".join(hints)
 
@@ -1076,8 +745,7 @@ def _collect_semantic_context(
                             _ROLE_FOCUS_NAME,
                             confidence="confirmed",
                             rule=(
-                                "Ключ совпадает с id существующего блока "
-                                f"{block.kind}."
+                                f"Ключ совпадает с id существующего блока {block.kind}."
                             ),
                             block=block,
                             property_name="id",
@@ -1151,9 +819,7 @@ def _collect_semantic_context(
             bind(block.kind, _ROLE_TOOLTIP)
             bind_descriptions(block.kind, _ROLE_TOOLTIP)
 
-    for blocks in blocks_for(
-        "common/military_industrial_organization/organizations"
-    ):
+    for blocks in blocks_for("common/military_industrial_organization/organizations"):
         for block in blocks:
             bind(block.kind, _ROLE_MIO_NAME)
             for key in block.properties.get("name", []):
@@ -1161,10 +827,7 @@ def _collect_semantic_context(
 
     for blocks in blocks_for("common/technologies"):
         for block in blocks:
-            if (
-                block.parent is None
-                or block.parent.kind.casefold() != "technologies"
-            ):
+            if block.parent is None or block.parent.kind.casefold() != "technologies":
                 continue
             technology_id = block.kind
             for key in database_names.get(technology_id, ()):
@@ -1175,10 +838,7 @@ def _collect_semantic_context(
     equipment_ids: set[str] = set()
     for blocks in blocks_for("common/units/equipment"):
         for block in blocks:
-            if (
-                block.parent is None
-                or block.parent.kind.casefold() != "equipments"
-            ):
+            if block.parent is None or block.parent.kind.casefold() != "equipments":
                 continue
             equipment_id = block.kind
             equipment_ids.add(equipment_id)
@@ -1206,9 +866,7 @@ def _collect_semantic_context(
                         key,
                         _ROLE_EVENT_TITLE,
                         confidence="confirmed",
-                        rule=(
-                            f"Ключ явно указан в title блока {block.kind}."
-                        ),
+                        rule=(f"Ключ явно указан в title блока {block.kind}."),
                         block=block,
                         property_name="title",
                     )
@@ -1217,9 +875,7 @@ def _collect_semantic_context(
                         key,
                         _ROLE_EVENT_DESCRIPTION,
                         confidence="confirmed",
-                        rule=(
-                            f"Ключ явно указан в desc блока {block.kind}."
-                        ),
+                        rule=(f"Ключ явно указан в desc блока {block.kind}."),
                         block=block,
                         property_name="desc",
                     )
@@ -1232,10 +888,7 @@ def _collect_semantic_context(
                         key,
                         _ROLE_EVENT_DESCRIPTION,
                         confidence="confirmed",
-                        rule=(
-                            "Ключ явно указан в text условного описания "
-                            "ивента."
-                        ),
+                        rule=("Ключ явно указан в text условного описания ивента."),
                         block=block,
                         property_name="text",
                     )
@@ -1245,10 +898,7 @@ def _collect_semantic_context(
                         key,
                         _ROLE_EVENT_OPTION,
                         confidence="confirmed",
-                        rule=(
-                            "Ключ явно указан в name варианта ответа "
-                            "ивента."
-                        ),
+                        rule=("Ключ явно указан в name варианта ответа ивента."),
                         block=block,
                         property_name="name",
                     )
@@ -1279,11 +929,7 @@ def _collect_semantic_context(
 
     country_tags: set[str] = set()
     for blocks in blocks_for("common/countries"):
-        country_tags.update(
-            block.kind
-            for block in blocks
-            if block.parent is None
-        )
+        country_tags.update(block.kind for block in blocks if block.parent is None)
     for tag in country_tags:
         for ideology in (
             "communism",
@@ -1333,14 +979,8 @@ def _collect_scripted_localisation_context(
         parts = re.split(r"\[[^\]]+\]", raw_key)
         if sum(len(part) for part in parts) < 4:
             return set()
-        pattern = re.compile(
-            "^" + ".+".join(re.escape(part) for part in parts) + "$"
-        )
-        return {
-            key
-            for key in localisation_keys
-            if pattern.fullmatch(key)
-        }
+        pattern = re.compile("^" + ".+".join(re.escape(part) for part in parts) + "$")
+        return {key for key in localisation_keys if pattern.fullmatch(key)}
 
     files_checked = 0
     for path in _effective_data_files(
@@ -1375,11 +1015,7 @@ def _collect_scripted_localisation_context(
 
     calls_by_key: dict[str, frozenset[str]] = {}
     for key, values in localisation_values.items():
-        calls = {
-            call
-            for value in values
-            for call in _localisation_calls(value)
-        }
+        calls = {call for value in values for call in _localisation_calls(value)}
         if calls:
             calls_by_key[key] = frozenset(calls)
 
@@ -1409,10 +1045,7 @@ def _collect_scripted_localisation_context(
     while function_queue:
         function_name = function_queue.popleft()
         queued.discard(function_name)
-        new_fonts = (
-            function_fonts[function_name]
-            - processed_fonts[function_name]
-        )
+        new_fonts = function_fonts[function_name] - processed_fonts[function_name]
         if not new_fonts:
             continue
         processed_fonts[function_name].update(new_fonts)
@@ -1454,10 +1087,7 @@ def _collect_scripted_localisation_context(
     while role_queue:
         function_name = role_queue.popleft()
         queued_roles.discard(function_name)
-        new_roles = (
-            function_roles[function_name]
-            - processed_roles[function_name]
-        )
+        new_roles = function_roles[function_name] - processed_roles[function_name]
         if not new_roles:
             continue
         processed_roles[function_name].update(new_roles)
@@ -1549,19 +1179,17 @@ def build_font_context(
         role_evidence,
         read_errors,
     )
-    dynamic_files_checked, dynamic_keys = (
-        _collect_scripted_localisation_context(
-            mod_root,
-            resolved_game,
-            keys,
-            localisation_values or {},
-            key_fonts,
-            key_roles,
-            role_evidence,
-            dynamic_function_fonts,
-            dynamic_function_roles,
-            read_errors,
-        )
+    dynamic_files_checked, dynamic_keys = _collect_scripted_localisation_context(
+        mod_root,
+        resolved_game,
+        keys,
+        localisation_values or {},
+        key_fonts,
+        key_roles,
+        role_evidence,
+        dynamic_function_fonts,
+        dynamic_function_roles,
+        read_errors,
     )
     script_files_checked += dynamic_files_checked
     semantic_keys = semantic_keys | dynamic_keys
@@ -1569,14 +1197,8 @@ def build_font_context(
     return FontContextIndex(
         mod_root=mod_root,
         game_root=resolved_game,
-        key_fonts={
-            key: frozenset(fonts)
-            for key, fonts in key_fonts.items()
-        },
-        key_roles={
-            key: frozenset(roles)
-            for key, roles in key_roles.items()
-        },
+        key_fonts={key: frozenset(fonts) for key, fonts in key_fonts.items()},
+        key_roles={key: frozenset(roles) for key, roles in key_roles.items()},
         role_evidence={
             key_role: tuple(sorted(evidence, key=RoleEvidence.sort_key))
             for key_role, evidence in role_evidence.items()
