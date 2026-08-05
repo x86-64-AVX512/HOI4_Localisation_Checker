@@ -52,7 +52,7 @@ class GuiTests(unittest.TestCase):
         )
         self.assertEqual(
             "disabled",
-            str(self.app.layout_export_button.cget("state")),
+            str(self.app.layout_tab.export_button.cget("state")),
         )
         self.assertEqual(
             "disabled",
@@ -62,7 +62,7 @@ class GuiTests(unittest.TestCase):
     def test_export_buttons_follow_rows_and_busy_state(self) -> None:
         tables_and_buttons = (
             (self.app.table, self.app.export_button),
-            (self.app.layout_table, self.app.layout_export_button),
+            (self.app.layout_tab.table, self.app.layout_tab.export_button),
             (self.app.compare_tab.table, self.app.compare_tab.export_button),
         )
         for table, _ in tables_and_buttons:
@@ -102,6 +102,21 @@ class GuiTests(unittest.TestCase):
         )
         self.assertFalse(settings.check_russian_straight_quotes)
         self.assertEqual(2, saved["format_version"])
+
+    def test_layout_options_are_saved_through_extracted_tab(self) -> None:
+        self.app.layout_tab.focus_limit_var.set("365")
+        self.app.layout_tab.event_limit_var.set("3500")
+
+        result = self.app._layout_controls_changed()
+
+        settings = load_settings(self.app_root / "settings.json")
+        self.assertEqual("break", result)
+        self.assertEqual(365, settings.layout_focus_limit)
+        self.assertEqual(3500, settings.layout_event_limit)
+        self.assertEqual(
+            "Настройки проверки текстов сохранены.",
+            self.app.layout_tab.current_file_var.get(),
+        )
 
     def test_main_table_export_preserves_visible_values(self) -> None:
         destination = self.app_root / "exports" / "results.csv"
