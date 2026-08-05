@@ -8,7 +8,6 @@ from typing import Callable, Literal
 from .models import Diagnostic, LocalisationEntry
 from .parser import parse_localisation_file
 
-
 ComparisonCategory = Literal[
     "missing_russian",
     "missing_english",

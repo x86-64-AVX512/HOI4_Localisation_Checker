@@ -10,7 +10,6 @@ from .models import (
     RenderedCharacter,
 )
 
-
 UTF8_BOM = b"\xef\xbb\xbf"
 UTF16_LE_BOM = b"\xff\xfe"
 UTF16_BE_BOM = b"\xfe\xff"

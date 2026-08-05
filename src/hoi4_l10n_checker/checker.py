@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import unicodedata
 import re
+import unicodedata
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -11,7 +11,6 @@ from .font_context import FontContextIndex, build_font_context
 from .font_profile import CoverageMode, FontProfile
 from .models import Diagnostic, LocalisationEntry
 from .parser import iter_rendered_characters, parse_localisation_file
-
 
 ProgressCallback = Callable[[int, int, Path], None]
 GlyphMode = Literal["soft", "strict", "contextual"]

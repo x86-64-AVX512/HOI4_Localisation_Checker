@@ -7,7 +7,6 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Iterable
 
-
 CURRENT_SETTINGS_FORMAT_VERSION = 2
 
 

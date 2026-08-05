@@ -6,7 +6,6 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-
 KNOWN_LANGUAGES = (
     "l_english",
     "l_braz_por",

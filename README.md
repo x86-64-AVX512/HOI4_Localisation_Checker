@@ -84,6 +84,12 @@ python -m venv .venv
 
 ## Тесты
 
+Для проверок разработчика установите отдельные зависимости:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+```
+
 ```powershell
 .\run_tests.ps1
 ```
@@ -94,6 +100,17 @@ python -m venv .venv
 $env:PYTHONPATH = (Join-Path (Get-Location) "src")
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
+
+Линтер и отчёт покрытия запускаются так:
+
+```powershell
+.\.venv\Scripts\python.exe -m ruff check .
+.\.venv\Scripts\python.exe -m coverage run -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe -m coverage report
+```
+
+Набор тестов включает автоматические проверки создания Tk-интерфейса,
+состояний кнопок, фильтрации, сортировки, экспорта и обработки фоновых событий.
 
 ## Сборка EXE
 

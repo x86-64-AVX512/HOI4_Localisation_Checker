@@ -6,6 +6,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Literal, Protocol
 
+from .focus_preview_cli import (
+    FocusPreviewBatchResult,
+    FocusPreviewClient,
+    FocusPreviewRequestItem,
+    FocusPreviewResult,
+)
 from .font_context import (
     ROLE_EVENT_DESCRIPTION,
     ROLE_FOCUS_DESCRIPTION,
@@ -14,15 +20,8 @@ from .font_context import (
     RoleEvidence,
     build_font_context,
 )
-from .focus_preview_cli import (
-    FocusPreviewBatchResult,
-    FocusPreviewClient,
-    FocusPreviewRequestItem,
-    FocusPreviewResult,
-)
 from .models import Diagnostic, LocalisationEntry
 from .parser import iter_rendered_characters, parse_localisation_file
-
 
 FocusCheckMode = Literal["length", "newline", "exact"]
 FocusPreviewPriorityMode = Literal["auto_ru", "auto_en", "ru", "en"]

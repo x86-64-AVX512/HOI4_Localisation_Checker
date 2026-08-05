@@ -5,7 +5,6 @@ import re
 from pathlib import Path
 from typing import Literal
 
-
 _CHAR_LINE = re.compile(rb"^char\s+id=(\d+)(?:\s|$)")
 _ANSI_CHARSET = re.compile(rb'\bcharset="?ANSI"?(?:\s|$)', re.IGNORECASE)
 _UNICODE_ENABLED = re.compile(rb"\bunicode=1(?:\s|$)")

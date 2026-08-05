@@ -24,15 +24,25 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install quality tools
+        shell: pwsh
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Lint source
+        shell: pwsh
+        run: python -m ruff check .
+
       - name: Compile source
         shell: pwsh
         run: python -m compileall -q src app.py tools
 
-      - name: Run unit tests
+      - name: Run tests with coverage
         shell: pwsh
         env:
           PYTHONPATH: ${{ github.workspace }}\src
-        run: python -m unittest discover -s tests -v
+        run: |
+          python -m coverage run -m unittest discover -s tests -v
+          python -m coverage report
 
       - name: Check font preparation CLI
         shell: pwsh

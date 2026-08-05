@@ -20,7 +20,6 @@ if str(SOURCE_DIRECTORY) not in sys.path:
 
 from hoi4_l10n_checker.gui import run_gui  # noqa: E402
 
-
 if __name__ == "__main__":
     run_gui(_application_root())
 

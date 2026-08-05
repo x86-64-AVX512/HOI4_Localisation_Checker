@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Iterator, Mapping
 
-
 _GUI_TOKEN = re.compile(
     r'"(?:\\.|[^"\\])*"|#[^\r\n]*|[{}=]|[^\s{}="#]+'
 )

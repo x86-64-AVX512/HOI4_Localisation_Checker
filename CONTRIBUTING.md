@@ -9,6 +9,7 @@
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 ```
 
 Игровые `.fnt` не хранятся в Git. Для локального запуска подготовьте их по
@@ -21,7 +22,14 @@ python -m venv .venv
 ```powershell
 .\run_tests.ps1
 .\.venv\Scripts\python.exe -m compileall -q src app.py tools
+.\.venv\Scripts\python.exe -m ruff check .
+.\.venv\Scripts\python.exe -m coverage run -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe -m coverage report
 ```
+
+GUI-тесты создают настоящий скрытый Tk-интерфейс, поэтому полный набор
+запускается на Windows. Жёсткий минимальный процент покрытия пока не задан:
+отчёт используется как исходная точка и не должен заметно ухудшаться.
 
 Если изменение затрагивает сборку, дополнительно выполните `build.ps1` и
 проверьте запуск созданного EXE.

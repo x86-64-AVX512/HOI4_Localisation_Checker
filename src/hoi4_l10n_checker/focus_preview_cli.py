@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Literal, Mapping
 
-
 FOCUS_PREVIEW_PROTOCOL = "eaw-focus-text-preview/1"
 FocusPreviewPolicy = Literal["visual", "strict"]
 GlyphPriority = Literal["ru", "en"]

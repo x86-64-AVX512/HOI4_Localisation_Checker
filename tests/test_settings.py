@@ -7,8 +7,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from hoi4_l10n_checker.settings import (
-    AppSettings,
     CURRENT_SETTINGS_FORMAT_VERSION,
+    AppSettings,
     SettingsError,
     load_excluded_characters,
     load_settings,

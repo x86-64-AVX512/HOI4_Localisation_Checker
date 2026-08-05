@@ -12,6 +12,10 @@ from typing import cast
 
 from .checker import GlyphMode, LocalisationChecker, ScanResult
 from .csv_export import export_csv
+from .focus_preview_cli import (
+    FocusPreviewError,
+    validate_focus_preview_installation,
+)
 from .font_context import (
     find_hoi4_install,
     find_mod_root,
@@ -19,10 +23,6 @@ from .font_context import (
     mod_display_name,
 )
 from .font_profile import FontProfile, FontProfileError
-from .focus_preview_cli import (
-    FocusPreviewError,
-    validate_focus_preview_installation,
-)
 from .localisation_compare import (
     ComparisonIssue,
     ComparisonLanguage,
@@ -51,7 +51,6 @@ from .text_layout_checker import (
     TextLayoutResult,
 )
 from .version import DISPLAY_VERSION
-
 
 _GLYPH_DIAGNOSTIC_CODES = frozenset(
     {"UNSAFE_GLYPH", "UNKNOWN_FONT_CONTEXT"}
