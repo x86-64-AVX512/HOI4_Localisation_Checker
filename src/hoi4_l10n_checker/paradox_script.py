@@ -18,6 +18,7 @@ __all__ = [
     "localisation_calls",
     "parse_blocks",
     "property_line",
+    "read_script_blocks",
     "token_value",
     "tokenize_script",
     "tokenize_script_with_lines",
@@ -106,6 +107,18 @@ def parse_blocks(
             continue
         index += 1
     return blocks
+
+
+def read_script_blocks(
+    path: Path,
+    read_errors: list[str],
+) -> list[ParsedBlock]:
+    try:
+        text = path.read_text(encoding="utf-8-sig", errors="replace")
+    except OSError as error:
+        read_errors.append(f"Не удалось прочитать {path}: {error}")
+        return []
+    return parse_blocks(text, source_path=path)
 
 
 def block_name(block: ParsedBlock) -> str:
