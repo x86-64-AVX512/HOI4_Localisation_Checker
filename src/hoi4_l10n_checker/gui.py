@@ -30,6 +30,10 @@ from .font_context import (
     mod_display_name,
 )
 from .font_profile import FontProfile, FontProfileError
+from .gui_check_tab import (
+    GLYPH_DIAGNOSTIC_CODES,
+    LocalisationCheckTab,
+)
 from .gui_compare_tab import ComparisonTab
 from .gui_layout_tab import TextLayoutTab
 from .localisation_compare import (
@@ -58,16 +62,13 @@ from .text_layout_checker import (
 )
 from .version import DISPLAY_VERSION
 
-_GLYPH_DIAGNOSTIC_CODES = frozenset(
-    {"UNSAFE_GLYPH", "UNKNOWN_FONT_CONTEXT"}
-)
+
 class CheckerApplication:
     def __init__(self, root: tk.Tk, app_root: Path) -> None:
         self.root = root
         self.app_root = app_root
         self.tasks = BackgroundTaskRunner()
         self.busy = False
-        self.diagnostics_by_item: dict[str, Diagnostic] = {}
         self.settings_path = settings_path_for(app_root)
         self.settings_error = ""
         self.exceptions_dialog: tk.Toplevel | None = None
@@ -78,26 +79,16 @@ class CheckerApplication:
             settings = load_settings(self.settings_path)
             self.excluded_characters = set(settings.excluded_characters)
             self.notepad_plus_plus_path = settings.notepad_plus_plus_path
-            self.notepad_plus_plus_fullscreen = (
-                settings.notepad_plus_plus_fullscreen
-            )
+            self.notepad_plus_plus_fullscreen = settings.notepad_plus_plus_fullscreen
             self.context_mod_path = settings.context_mod_path
             self.hoi4_install_path = settings.hoi4_install_path
-            self.show_unknown_context_warnings = (
-                settings.show_unknown_context_warnings
-            )
-            self.check_russian_straight_quotes = (
-                settings.check_russian_straight_quotes
-            )
+            self.show_unknown_context_warnings = settings.show_unknown_context_warnings
+            self.check_russian_straight_quotes = settings.check_russian_straight_quotes
             self.layout_focus_enabled = settings.layout_focus_enabled
             self.layout_focus_mode = settings.layout_focus_mode
             self.layout_focus_limit = settings.layout_focus_limit
-            self.layout_focus_preview_cli_path = (
-                settings.layout_focus_preview_cli_path
-            )
-            self.layout_focus_preview_priority = (
-                settings.layout_focus_preview_priority
-            )
+            self.layout_focus_preview_cli_path = settings.layout_focus_preview_cli_path
+            self.layout_focus_preview_priority = settings.layout_focus_preview_priority
             self.layout_events_enabled = settings.layout_events_enabled
             self.layout_event_limit = settings.layout_event_limit
             self.layout_welcome_enabled = settings.layout_welcome_enabled
@@ -170,373 +161,28 @@ class CheckerApplication:
     def _build_ui(self) -> None:
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill=tk.BOTH, expand=True)
-        outer = ttk.Frame(self.notebook, padding=12)
-        self.notebook.add(outer, text="Проверка локализации")
-
-        controls = ttk.Frame(outer)
-        controls.pack(fill=tk.X)
-
-        self.file_button = ttk.Button(
-            controls,
-            text="Проверить файл",
-            command=self._choose_file,
-        )
-        self.file_button.pack(side=tk.LEFT)
-
-        self.folder_button = ttk.Button(
-            controls,
-            text="Проверить папку",
-            command=self._choose_folder,
-        )
-        self.folder_button.pack(side=tk.LEFT, padx=(8, 0))
-
-        self.clear_button = ttk.Button(
-            controls,
-            text="Очистить результаты",
-            command=self._clear_results,
-        )
-        self.clear_button.pack(side=tk.LEFT, padx=(8, 0))
-
-        self.copy_key_button = ttk.Button(
-            controls,
-            text="Копировать ключ",
-            command=self._copy_selected_key,
-            state=tk.DISABLED,
-        )
-        self.copy_key_button.pack(side=tk.LEFT, padx=(8, 0))
-
-        self.copy_character_button = ttk.Button(
-            controls,
-            text="Копировать символ",
-            command=self._copy_selected_character,
-            state=tk.DISABLED,
-        )
-        self.copy_character_button.pack(side=tk.LEFT, padx=(8, 0))
-
-        self.export_button = ttk.Button(
-            controls,
-            text="Выгрузить результаты…",
-            command=lambda: self._export_table_results(
-                self.table,
-                "localisation_check",
-                self.current_file_var,
-            ),
-            state=tk.DISABLED,
-        )
-        self.export_button.pack(side=tk.LEFT, padx=(8, 0))
-
-        self.summary_var = tk.StringVar(value="Выберите .yml-файл или папку.")
-        ttk.Label(controls, textvariable=self.summary_var).pack(
-            side=tk.LEFT,
-            padx=(18, 0),
-        )
-
-        mode_frame = ttk.LabelFrame(
-            outer,
-            text="Режим проверки символов",
-            padding=(10, 6),
-        )
-        mode_frame.pack(fill=tk.X, pady=(10, 0))
-        mode_frame.columnconfigure(0, weight=1)
-        mode_frame.columnconfigure(1, weight=1)
-        mode_frame.columnconfigure(2, weight=1)
-
-        self.glyph_mode_var = tk.StringVar(value="soft")
-        initial_mode_state = (
-            tk.NORMAL if self.font_profile is not None else tk.DISABLED
-        )
-        self.soft_mode_button = ttk.Radiobutton(
-            mode_frame,
-            text="Мягкий",
-            variable=self.glyph_mode_var,
-            value="soft",
-            state=initial_mode_state,
-        )
-        self.soft_mode_button.grid(row=0, column=0, sticky=tk.W)
-        ttk.Label(
-            mode_frame,
-            text=(
-                "Для быстрой проверки. Символ допустим, если он есть хотя бы "
-                "в одном шрифте. Может пропустить много неподдерживаемых символов."
-            ),
-            justify=tk.LEFT,
-            wraplength=350,
-        ).grid(row=1, column=0, sticky="ew", padx=(22, 14))
-
-        self.strict_mode_button = ttk.Radiobutton(
-            mode_frame,
-            text="Жёсткий — классический",
-            variable=self.glyph_mode_var,
-            value="strict",
-            state=initial_mode_state,
-        )
-        self.strict_mode_button.grid(row=0, column=1, sticky=tk.W)
-        ttk.Label(
-            mode_frame,
-            text=(
-                "Символ допустим, только если он есть в каждом используемом "
-                "семействе шрифтов. Возможно много ложных срабатываний."
-            ),
-            justify=tk.LEFT,
-            wraplength=350,
-        ).grid(row=1, column=1, sticky="ew", padx=(22, 0))
-
-        self.contextual_mode_button = ttk.Radiobutton(
-            mode_frame,
-            text="Жёсткий — контекстный",
-            variable=self.glyph_mode_var,
-            value="contextual",
-            state=initial_mode_state,
-        )
-        self.contextual_mode_button.grid(
-            row=0,
-            column=2,
-            sticky=tk.W,
-            padx=(14, 0),
-        )
-        ttk.Label(
-            mode_frame,
-            text=(
-                "Перепроверяет классические предупреждения по шрифту, "
-                "назначенному ключу в интерфейсе. По умолчанию показывает "
-                "только подтверждённое отсутствие глифа."
-            ),
-            justify=tk.LEFT,
-            wraplength=350,
-        ).grid(row=1, column=2, sticky="ew", padx=(36, 0))
-
-        ttk.Label(
-            mode_frame,
-            text=(
-                "Режим влияет только на предупреждения UNSAFE_GLYPH. "
-                "Ошибки и остальные проверки одинаковы."
-            ),
-        ).grid(
-            row=2,
-            column=0,
-            columnspan=2,
-            sticky=tk.W,
-            pady=(6, 0),
-        )
-
-        self.exceptions_button = ttk.Button(
-            mode_frame,
-            command=self._open_exceptions_dialog,
-        )
-        self.exceptions_button.grid(
-            row=2,
-            column=2,
-            sticky=tk.E,
-            pady=(6, 0),
+        self.check_tab = LocalisationCheckTab(
+            root=self.root,
+            notebook=self.notebook,
+            font_available=self.font_profile is not None,
+            font_status=self.font_status,
+            show_unknown_context=self.show_unknown_context_warnings,
+            check_russian_straight_quotes=self.check_russian_straight_quotes,
+            notepad_fullscreen=self.notepad_plus_plus_fullscreen,
+            on_choose_file=self._choose_file,
+            on_choose_folder=self._choose_folder,
+            on_open_exceptions=self._open_exceptions_dialog,
+            on_select_context_mod=self._select_context_mod,
+            on_unknown_context_changed=self._unknown_context_visibility_changed,
+            on_russian_quotes_changed=self._russian_straight_quotes_changed,
+            on_notepad_mode_changed=self._notepad_window_mode_changed,
+            on_open_diagnostic=self._open_diagnostic,
+            on_add_selected_exception=(self._add_selected_character_to_exceptions),
+            is_character_excluded=self.excluded_characters.__contains__,
+            on_export=self._export_table_results,
         )
         self._refresh_exceptions_ui()
-
-        context_path_frame = ttk.Frame(mode_frame)
-        context_path_frame.grid(
-            row=3,
-            column=0,
-            columnspan=3,
-            sticky="ew",
-            pady=(8, 0),
-        )
-        context_path_frame.columnconfigure(1, weight=1)
-        ttk.Label(
-            context_path_frame,
-            text="Папка мода для контекстного режима:",
-        ).grid(row=0, column=0, sticky=tk.W)
-        self.context_mod_var = tk.StringVar()
-        ttk.Label(
-            context_path_frame,
-            textvariable=self.context_mod_var,
-            anchor=tk.W,
-        ).grid(row=0, column=1, sticky="ew", padx=(8, 8))
-        self.context_mod_button = ttk.Button(
-            context_path_frame,
-            text="Выбрать…",
-            command=self._select_context_mod,
-        )
-        self.context_mod_button.grid(row=0, column=2, sticky=tk.E)
         self._refresh_context_mod_ui()
-
-        self.show_unknown_context_var = tk.BooleanVar(
-            value=self.show_unknown_context_warnings
-        )
-        self.show_unknown_context_button = ttk.Checkbutton(
-            mode_frame,
-            text=(
-                "Показывать неопределённый контекст "
-                "(может вернуть много ложных срабатываний)"
-            ),
-            variable=self.show_unknown_context_var,
-            command=self._unknown_context_visibility_changed,
-        )
-        self.show_unknown_context_button.grid(
-            row=4,
-            column=0,
-            columnspan=3,
-            sticky=tk.W,
-            pady=(7, 0),
-        )
-
-        additional_checks_frame = ttk.LabelFrame(
-            outer,
-            text="Дополнительные проверки",
-            padding=(10, 6),
-        )
-        additional_checks_frame.pack(fill=tk.X, pady=(10, 0))
-        self.russian_straight_quotes_var = tk.BooleanVar(
-            value=self.check_russian_straight_quotes
-        )
-        self.russian_straight_quotes_button = ttk.Checkbutton(
-            additional_checks_frame,
-            text=(
-                'Предупреждать о прямых кавычках "…" '
-                "в русской локализации"
-            ),
-            variable=self.russian_straight_quotes_var,
-            command=self._russian_straight_quotes_changed,
-        )
-        self.russian_straight_quotes_button.pack(side=tk.LEFT)
-        ttk.Label(
-            additional_checks_frame,
-            text=(
-                "Проверяется только текст под l_russian:; "
-                "служебные кавычки вокруг значения не учитываются."
-            ),
-        ).pack(side=tk.LEFT, padx=(16, 0))
-
-        editor_frame = ttk.LabelFrame(
-            outer,
-            text="Открытие в Notepad++",
-            padding=(10, 6),
-        )
-        editor_frame.pack(fill=tk.X, pady=(10, 0))
-        self.notepad_fullscreen_var = tk.BooleanVar(
-            value=self.notepad_plus_plus_fullscreen
-        )
-        ttk.Checkbutton(
-            editor_frame,
-            text="Открывать Notepad++ в полноэкранном режиме (F11)",
-            variable=self.notepad_fullscreen_var,
-            command=self._notepad_window_mode_changed,
-        ).pack(side=tk.LEFT)
-        ttk.Label(
-            editor_frame,
-            text="Настройка сохраняется в settings.json рядом с программой.",
-        ).pack(side=tk.LEFT, padx=(16, 0))
-
-        self.progress = ttk.Progressbar(outer, mode="determinate")
-        self.progress.pack(fill=tk.X, pady=(10, 4))
-
-        self.current_file_var = tk.StringVar(value=self.font_status)
-        ttk.Label(
-            outer,
-            textvariable=self.current_file_var,
-            anchor=tk.W,
-        ).pack(fill=tk.X, pady=(0, 8))
-
-        table_frame = ttk.Frame(outer)
-        table_frame.pack(fill=tk.BOTH, expand=True)
-
-        columns = ("severity", "code", "file", "line", "column", "key", "message")
-        self.table = ttk.Treeview(
-            table_frame,
-            columns=columns,
-            show="headings",
-            selectmode="browse",
-        )
-        headings = {
-            "severity": "Уровень",
-            "code": "Проверка",
-            "file": "Файл",
-            "line": "Строка",
-            "column": "Столбец",
-            "key": "Ключ",
-            "message": "Описание",
-        }
-        widths = {
-            "severity": 80,
-            "code": 190,
-            "file": 310,
-            "line": 65,
-            "column": 70,
-            "key": 210,
-            "message": 520,
-        }
-        for column in columns:
-            self.table.heading(column, text=headings[column])
-            self.table.column(
-                column,
-                width=widths[column],
-                minwidth=50,
-                stretch=column in {"file", "key", "message"},
-                anchor=tk.W,
-            )
-
-        vertical = ttk.Scrollbar(
-            table_frame,
-            orient=tk.VERTICAL,
-            command=self.table.yview,
-        )
-        horizontal = ttk.Scrollbar(
-            table_frame,
-            orient=tk.HORIZONTAL,
-            command=self.table.xview,
-        )
-        self.table.configure(
-            yscrollcommand=vertical.set,
-            xscrollcommand=horizontal.set,
-        )
-
-        self.table.grid(row=0, column=0, sticky="nsew")
-        vertical.grid(row=0, column=1, sticky="ns")
-        horizontal.grid(row=1, column=0, sticky="ew")
-        table_frame.rowconfigure(0, weight=1)
-        table_frame.columnconfigure(0, weight=1)
-
-        self.table.tag_configure("error", foreground="#B00020")
-        self.table.tag_configure("warning", foreground="#9A6700")
-
-        detail_frame = ttk.LabelFrame(
-            outer,
-            text="Полное сообщение — двойной щелчок открывает строку в Notepad++",
-            padding=6,
-        )
-        detail_frame.pack(fill=tk.X, pady=(10, 0))
-        self.detail_var = tk.StringVar(value="")
-        ttk.Label(
-            detail_frame,
-            textvariable=self.detail_var,
-            anchor=tk.W,
-            justify=tk.LEFT,
-            wraplength=1120,
-        ).pack(fill=tk.X)
-        self.table.bind("<<TreeviewSelect>>", self._show_selected_detail)
-        self.table.bind("<Control-c>", self._copy_selected_key)
-        self.table.bind("<Control-C>", self._copy_selected_key)
-        self.table.bind("<Double-1>", self._open_double_clicked_diagnostic)
-        self.table.bind("<Button-3>", self._show_context_menu)
-
-        self.context_menu = tk.Menu(self.root, tearoff=False)
-        self.context_menu.add_command(
-            label="Открыть в Notepad++",
-            command=self._open_selected_diagnostic,
-        )
-        self.context_menu.add_separator()
-        self.context_menu.add_command(
-            label="Копировать ключ",
-            command=self._copy_selected_key,
-        )
-        self.context_menu.add_command(
-            label="Копировать символ",
-            command=self._copy_selected_character,
-        )
-        self.context_menu.add_separator()
-        self.context_menu.add_command(
-            label="Добавить символ в исключения",
-            command=self._add_selected_character_to_exceptions,
-        )
-
         self._build_layout_tab()
         self._build_compare_tab()
         self._refresh_export_controls()
@@ -613,9 +259,7 @@ class CheckerApplication:
             self._start_layout_scan(Path(selected))
 
     def _choose_layout_folder(self) -> None:
-        selected = filedialog.askdirectory(
-            title="Выберите папку с локализациями"
-        )
+        selected = filedialog.askdirectory(title="Выберите папку с локализациями")
         if selected:
             self._start_layout_scan(Path(selected))
 
@@ -657,9 +301,7 @@ class CheckerApplication:
         if not selected:
             return None
         try:
-            executable = validate_focus_preview_installation(
-                Path(selected)
-            )
+            executable = validate_focus_preview_installation(Path(selected))
         except FocusPreviewError as error:
             messagebox.showerror(
                 "Неполная установка EaW Focus Text Preview",
@@ -680,9 +322,7 @@ class CheckerApplication:
             self._refresh_focus_preview_ui()
             return None
         self._refresh_focus_preview_ui()
-        self.layout_tab.set_status(
-            f"Точный проверяющий модуль выбран: {executable}"
-        )
+        self.layout_tab.set_status(f"Точный проверяющий модуль выбран: {executable}")
         return executable
 
     def _require_focus_preview_cli(self) -> Path | None:
@@ -718,9 +358,7 @@ class CheckerApplication:
         if language not in {"english", "russian"}:
             raise ValueError("Неизвестная сторона сравнения.")
         attribute = (
-            "compare_english_path"
-            if language == "english"
-            else "compare_russian_path"
+            "compare_english_path" if language == "english" else "compare_russian_path"
         )
         current_value = getattr(self, attribute)
         current = Path(current_value) if current_value else None
@@ -752,20 +390,13 @@ class CheckerApplication:
             )
             return None
         self._refresh_compare_paths_ui()
-        self.compare_tab.status_var.set(
-            "Папка для сравнения выбрана: "
-            f"{path}"
-        )
+        self.compare_tab.status_var.set(f"Папка для сравнения выбрана: {path}")
         return path
 
     def _require_compare_folders(
         self,
     ) -> tuple[Path, Path] | None:
-        english = (
-            Path(self.compare_english_path)
-            if self.compare_english_path
-            else None
-        )
+        english = Path(self.compare_english_path) if self.compare_english_path else None
         if english is None or not english.is_dir():
             messagebox.showwarning(
                 "Нужна английская папка",
@@ -775,11 +406,7 @@ class CheckerApplication:
             if english is None:
                 return None
 
-        russian = (
-            Path(self.compare_russian_path)
-            if self.compare_russian_path
-            else None
-        )
+        russian = Path(self.compare_russian_path) if self.compare_russian_path else None
         if russian is None or not russian.is_dir():
             messagebox.showwarning(
                 "Нужна русская папка",
@@ -791,9 +418,7 @@ class CheckerApplication:
         return english.resolve(), russian.resolve()
 
     def _capture_layout_settings(self) -> TextLayoutOptions:
-        options = self.layout_tab.capture_options(
-            self.layout_focus_preview_cli_path
-        )
+        options = self.layout_tab.capture_options(self.layout_focus_preview_cli_path)
         self.layout_focus_enabled = options.focus_enabled
         self.layout_focus_mode = options.focus_mode
         self.layout_focus_limit = options.focus_limit
@@ -861,9 +486,7 @@ class CheckerApplication:
 
         self._refresh_layout_controls()
         self._refresh_focus_preview_ui()
-        self.layout_tab.set_status(
-            "Настройки проверки текстов сохранены."
-        )
+        self.layout_tab.set_status("Настройки проверки текстов сохранены.")
         return "break"
 
     def _refresh_layout_controls(self) -> None:
@@ -876,7 +499,9 @@ class CheckerApplication:
 
     def _refresh_context_mod_ui(self) -> None:
         if not self.context_mod_path:
-            self.context_mod_var.set("не указана — контекстный режим заблокирован")
+            self.check_tab.set_context_status(
+                "не указана — контекстный режим заблокирован"
+            )
             if hasattr(self, "layout_tab"):
                 self.layout_tab.set_context_status(
                     "не указана — проверка текстов заблокирована"
@@ -885,12 +510,12 @@ class CheckerApplication:
         path = Path(self.context_mod_path)
         if not path.is_dir() or not is_context_root(path):
             message = f"путь недоступен или не является папкой мода: {path}"
-            self.context_mod_var.set(message)
+            self.check_tab.set_context_status(message)
             if hasattr(self, "layout_tab"):
                 self.layout_tab.set_context_status(message)
             return
         message = f"{mod_display_name(path)} — {path}"
-        self.context_mod_var.set(message)
+        self.check_tab.set_context_status(message)
         if hasattr(self, "layout_tab"):
             self.layout_tab.set_context_status(message)
 
@@ -940,9 +565,7 @@ class CheckerApplication:
             return None
 
         self._refresh_context_mod_ui()
-        self.current_file_var.set(
-            f"Контекстный мод: {mod_display_name(path)} — {path}"
-        )
+        self.check_tab.set_status(f"Контекстный мод: {mod_display_name(path)} — {path}")
         if hasattr(self, "layout_tab"):
             self.layout_tab.set_status(
                 f"Мод для определения типов: {mod_display_name(path)} — {path}"
@@ -955,11 +578,7 @@ class CheckerApplication:
         purpose: str = "Контекстный жёсткий режим",
     ) -> Path | None:
         while True:
-            configured = (
-                Path(self.context_mod_path)
-                if self.context_mod_path
-                else None
-            )
+            configured = Path(self.context_mod_path) if self.context_mod_path else None
             if (
                 configured is None
                 or not configured.is_dir()
@@ -967,9 +586,7 @@ class CheckerApplication:
             ):
                 messagebox.showwarning(
                     "Нужно указать папку мода",
-                    (
-                        f"{purpose} нельзя запустить без корневой папки мода."
-                    ),
+                    (f"{purpose} нельзя запустить без корневой папки мода."),
                 )
                 configured = self._select_context_mod()
                 if configured is None:
@@ -1017,55 +634,17 @@ class CheckerApplication:
 
     def _set_busy(self, busy: bool) -> None:
         self.busy = busy
-        state = tk.DISABLED if busy else tk.NORMAL
-        self.file_button.configure(state=state)
-        self.folder_button.configure(state=state)
-        self.clear_button.configure(state=state)
-        self.exceptions_button.configure(state=state)
-        mode_state = (
-            tk.DISABLED
-            if busy or self.font_profile is None
-            else tk.NORMAL
-        )
-        self.soft_mode_button.configure(state=mode_state)
-        self.strict_mode_button.configure(state=mode_state)
-        self.contextual_mode_button.configure(state=mode_state)
-        self.context_mod_button.configure(state=state)
-        self.show_unknown_context_button.configure(state=state)
-        self.russian_straight_quotes_button.configure(state=state)
+        self.check_tab.set_busy(busy)
         self._refresh_layout_controls()
         self._refresh_compare_controls()
         self._refresh_export_controls()
 
     def _refresh_export_controls(self) -> None:
-        controls = (
-            (self.export_button, self.table),
-        )
-        for button, table in controls:
-            has_rows = bool(table.get_children(""))
-            button.configure(
-                state=(
-                    tk.NORMAL
-                    if not self.busy and has_rows
-                    else tk.DISABLED
-                )
-            )
+        self.check_tab.refresh_export_control()
         if hasattr(self, "compare_tab"):
             self.compare_tab.refresh_export_control()
         if hasattr(self, "layout_tab"):
             self.layout_tab.refresh_export_control()
-
-    def _clear_results(self) -> None:
-        for item in self.table.get_children():
-            self.table.delete(item)
-        self.diagnostics_by_item.clear()
-        self.summary_var.set("Результаты очищены.")
-        self.current_file_var.set(self.font_status)
-        self.detail_var.set("")
-        self.progress.configure(value=0, maximum=1)
-        self.copy_key_button.configure(state=tk.DISABLED)
-        self.copy_character_button.configure(state=tk.DISABLED)
-        self._refresh_export_controls()
 
     def _start_localisation_comparison(self) -> None:
         if self.tasks.is_running:
@@ -1095,38 +674,31 @@ class CheckerApplication:
         if self.tasks.is_running:
             return
 
-        glyph_mode = cast(GlyphMode, self.glyph_mode_var.get())
+        glyph_mode = self.check_tab.glyph_mode()
         context_mod_root: Path | None = None
         context_game_root: Path | None = None
         if glyph_mode == "contextual":
             context_mod_root = self._require_context_mod(target)
             if context_mod_root is None:
-                self.current_file_var.set(
+                self.check_tab.set_status(
                     "Контекстная проверка отменена: папка мода не указана."
                 )
                 return
             context_game_root = self._resolve_hoi4_install()
 
-        self._clear_results()
         excluded_characters = frozenset(self.excluded_characters)
-        show_unknown_context_warnings = (
-            self.show_unknown_context_warnings
-        )
-        check_russian_straight_quotes = (
-            self.check_russian_straight_quotes
-        )
-        self.summary_var.set(f"Проверяется: {target}")
+        show_unknown_context_warnings = self.show_unknown_context_warnings
+        check_russian_straight_quotes = self.check_russian_straight_quotes
         if glyph_mode == "contextual":
             game_note = (
                 f"; HOI4: {context_game_root}"
                 if context_game_root is not None
                 else "; стандартный интерфейс HOI4 не найден"
             )
-            self.current_file_var.set(
-                f"Контекст: {context_mod_root}{game_note}"
-            )
+            scan_status = f"Контекст: {context_mod_root}{game_note}"
         else:
-            self.current_file_var.set("Подготовка проверки…")
+            scan_status = "Подготовка проверки…"
+        self.check_tab.prepare_scan(target, scan_status)
 
         def work(reporter: TaskReporter) -> tuple[ScanResult, GlyphMode]:
             result = self.checker.scan(
@@ -1136,12 +708,8 @@ class CheckerApplication:
                 excluded_characters=excluded_characters,
                 context_mod_root=context_mod_root,
                 context_game_root=context_game_root,
-                show_unknown_context_warnings=(
-                    show_unknown_context_warnings
-                ),
-                check_russian_straight_quotes=(
-                    check_russian_straight_quotes
-                ),
+                show_unknown_context_warnings=(show_unknown_context_warnings),
+                check_russian_straight_quotes=(check_russian_straight_quotes),
             )
             return result, glyph_mode
 
@@ -1205,9 +773,7 @@ class CheckerApplication:
             purpose="Проверку текстов",
         )
         if context_mod_root is None:
-            self.layout_tab.set_status(
-                "Проверка отменена: папка мода не указана."
-            )
+            self.layout_tab.set_status("Проверка отменена: папка мода не указана.")
             return
         context_game_root = self._resolve_hoi4_install()
 
@@ -1259,11 +825,11 @@ class CheckerApplication:
 
     def _handle_task_progress(self, event: TaskProgress) -> None:
         if event.task == "localisation":
-            self.progress.configure(
-                maximum=event.total,
-                value=event.current,
+            self.check_tab.update_progress(
+                event.current,
+                event.total,
+                event.path,
             )
-            self.current_file_var.set(str(event.path))
         elif event.task == "layout":
             self.layout_tab.update_progress(
                 event.current,
@@ -1283,7 +849,7 @@ class CheckerApplication:
                 tuple[ScanResult, GlyphMode],
                 event.result,
             )
-            self._show_result(result, glyph_mode)
+            self.check_tab.show_result(result, glyph_mode)
         elif event.task == "layout":
             result = cast(TextLayoutResult, event.result)
             self.layout_tab.show_result(result)
@@ -1297,9 +863,7 @@ class CheckerApplication:
     def _handle_task_failure(self, event: TaskFailed) -> None:
         self._set_busy(False)
         if event.task == "localisation":
-            self.summary_var.set(
-                "Проверка завершилась внутренней ошибкой."
-            )
+            self.check_tab.show_failure()
             title = "Ошибка"
         elif event.task == "layout":
             self.layout_tab.show_failure()
@@ -1356,62 +920,6 @@ class CheckerApplication:
                 str(event.payload),
             )
 
-    def _show_result(
-        self,
-        result: ScanResult,
-        glyph_mode: GlyphMode,
-    ) -> None:
-        self.summary_var.set(
-            f"Файлов: {result.files_checked}; ключей: {result.entries_checked}; "
-            f"ошибок: {result.error_count}; предупреждений: {result.warning_count}."
-        )
-        mode_name = {
-            "soft": "мягкий",
-            "strict": "жёсткий — классический",
-            "contextual": "жёсткий — контекстный",
-        }[glyph_mode]
-        status = f"Проверка завершена ({mode_name}): {result.root}"
-        if glyph_mode == "contextual":
-            status += (
-                f"; контекстных GUI-файлов: {result.context_gui_files}; "
-                f"скриптовых файлов: {result.context_script_files}; "
-                f"ключей со шрифтом: {result.context_resolved_keys}; "
-                f"из них определено по типу: {result.context_semantic_keys}; "
-                f"снято предупреждений: {result.contextual_filtered_warnings}; "
-                f"неразрешённых: {result.contextual_unresolved_warnings}"
-            )
-        self.current_file_var.set(status)
-        self.progress.configure(
-            maximum=max(result.files_checked, 1),
-            value=result.files_checked,
-        )
-
-        for diagnostic in result.diagnostics:
-            self._insert_diagnostic(diagnostic)
-
-        if not result.diagnostics:
-            self.detail_var.set("Проблем не обнаружено.")
-        self._refresh_export_controls()
-
-    def _insert_diagnostic(self, diagnostic: Diagnostic) -> None:
-        level = "Ошибка" if diagnostic.severity == "error" else "Предупреждение"
-        item = self.table.insert(
-            "",
-            tk.END,
-            values=(
-                level,
-                diagnostic.code,
-                str(diagnostic.path),
-                diagnostic.line,
-                diagnostic.column,
-                diagnostic.key,
-                diagnostic.message,
-            ),
-            tags=(diagnostic.severity,),
-        )
-        self.table.set(item, "message", diagnostic.message)
-        self.diagnostics_by_item[item] = diagnostic
-
     @staticmethod
     def _show_layout_preview_errors(result: TextLayoutResult) -> None:
         if not result.preview_error_messages:
@@ -1434,10 +942,7 @@ class CheckerApplication:
         if issue is not None:
             for language in languages:
                 diagnostic = issue.diagnostic_for(language)
-                if (
-                    diagnostic is not None
-                    and diagnostic.path.is_file()
-                ):
+                if diagnostic is not None and diagnostic.path.is_file():
                     diagnostics.append((language, diagnostic))
         if not diagnostics:
             self.root.bell()
@@ -1445,28 +950,19 @@ class CheckerApplication:
 
         executable = self._resolve_notepad_plus_plus()
         if executable is None:
-            self.compare_tab.status_var.set(
-                "Открытие в Notepad++ отменено."
-            )
+            self.compare_tab.status_var.set("Открытие в Notepad++ отменено.")
             return "break"
 
         labels = {
             "english": "английский",
             "russian": "русский",
         }
-        requested = " и ".join(
-            labels[language]
-            for language, _ in diagnostics
-        )
-        self.compare_tab.status_var.set(
-            f"Открывается {requested} файл в Notepad++…"
-        )
+        requested = " и ".join(labels[language] for language, _ in diagnostics)
+        self.compare_tab.status_var.set(f"Открывается {requested} файл в Notepad++…")
         fullscreen = self.notepad_plus_plus_fullscreen
 
         def work() -> None:
-            opened: list[
-                tuple[ComparisonLanguage, Diagnostic, OpenResult]
-            ] = []
+            opened: list[tuple[ComparisonLanguage, Diagnostic, OpenResult]] = []
             try:
                 for language, diagnostic in diagnostics:
                     result = open_location(
@@ -1494,53 +990,6 @@ class CheckerApplication:
         threading.Thread(target=work, daemon=True).start()
         return "break"
 
-    def _show_selected_detail(self, _event: object) -> None:
-        selected = self.table.selection()
-        if not selected:
-            self.copy_key_button.configure(state=tk.DISABLED)
-            self.copy_character_button.configure(state=tk.DISABLED)
-            return
-        values = self.table.item(selected[0], "values")
-        if len(values) < 7:
-            self.copy_key_button.configure(state=tk.DISABLED)
-            self.copy_character_button.configure(state=tk.DISABLED)
-            return
-        diagnostic = self.diagnostics_by_item.get(selected[0])
-        self.copy_key_button.configure(
-            state=tk.NORMAL if str(values[5]) else tk.DISABLED
-        )
-        self.copy_character_button.configure(
-            state=(
-                tk.NORMAL
-                if diagnostic is not None
-                and diagnostic.code in _GLYPH_DIAGNOSTIC_CODES
-                and diagnostic.character
-                else tk.DISABLED
-            )
-        )
-        self.detail_var.set(
-            f"{values[2]}:{values[3]}:{values[4]} — {values[6]}"
-        )
-
-    def _selected_diagnostic(self) -> Diagnostic | None:
-        selected = self.table.selection()
-        if not selected:
-            return None
-        return self.diagnostics_by_item.get(selected[0])
-
-    def _selected_key(self) -> str:
-        diagnostic = self._selected_diagnostic()
-        return diagnostic.key if diagnostic is not None else ""
-
-    def _selected_character(self) -> str:
-        diagnostic = self._selected_diagnostic()
-        if (
-            diagnostic is None
-            or diagnostic.code not in _GLYPH_DIAGNOSTIC_CODES
-        ):
-            return ""
-        return diagnostic.character
-
     def _save_current_settings(self) -> None:
         save_settings(
             self.settings_path,
@@ -1550,21 +999,13 @@ class CheckerApplication:
                 notepad_plus_plus_fullscreen=self.notepad_plus_plus_fullscreen,
                 context_mod_path=self.context_mod_path,
                 hoi4_install_path=self.hoi4_install_path,
-                show_unknown_context_warnings=(
-                    self.show_unknown_context_warnings
-                ),
-                check_russian_straight_quotes=(
-                    self.check_russian_straight_quotes
-                ),
+                show_unknown_context_warnings=(self.show_unknown_context_warnings),
+                check_russian_straight_quotes=(self.check_russian_straight_quotes),
                 layout_focus_enabled=self.layout_focus_enabled,
                 layout_focus_mode=self.layout_focus_mode,
                 layout_focus_limit=self.layout_focus_limit,
-                layout_focus_preview_cli_path=(
-                    self.layout_focus_preview_cli_path
-                ),
-                layout_focus_preview_priority=(
-                    self.layout_focus_preview_priority
-                ),
+                layout_focus_preview_cli_path=(self.layout_focus_preview_cli_path),
+                layout_focus_preview_priority=(self.layout_focus_preview_priority),
                 layout_events_enabled=self.layout_events_enabled,
                 layout_event_limit=self.layout_event_limit,
                 layout_welcome_enabled=self.layout_welcome_enabled,
@@ -1604,13 +1045,9 @@ class CheckerApplication:
         path = Path(selected)
         columns = tuple(str(column) for column in table["columns"])
         headers = tuple(
-            str(table.heading(column, "text")).replace(" ↕", "")
-            for column in columns
+            str(table.heading(column, "text")).replace(" ↕", "") for column in columns
         )
-        rows = (
-            tuple(table.item(item, "values"))
-            for item in items
-        )
+        rows = (tuple(table.item(item, "values")) for item in items)
         try:
             row_count = export_csv(path, headers, rows)
         except (OSError, UnicodeError) as error:
@@ -1630,20 +1067,18 @@ class CheckerApplication:
                 "Папка выгрузки не запомнена",
                 f"CSV сохранён, но настройку сохранить не удалось:\n{error}",
             )
-        status_var.set(
-            f"Выгружено строк: {row_count}; файл: {path}"
-        )
+        status_var.set(f"Выгружено строк: {row_count}; файл: {path}")
 
     def _unknown_context_visibility_changed(self) -> None:
         previous = self.show_unknown_context_warnings
         self.show_unknown_context_warnings = (
-            self.show_unknown_context_var.get()
+            self.check_tab.show_unknown_context_var.get()
         )
         try:
             self._save_current_settings()
         except SettingsError as error:
             self.show_unknown_context_warnings = previous
-            self.show_unknown_context_var.set(previous)
+            self.check_tab.show_unknown_context_var.set(previous)
             messagebox.showerror(
                 "Настройка контекстных предупреждений не сохранена",
                 str(error),
@@ -1654,42 +1089,36 @@ class CheckerApplication:
             if self.show_unknown_context_warnings
             else "будут скрыты"
         )
-        self.current_file_var.set(
-            f"Ключи с неопределённым контекстом {state}."
-        )
+        self.check_tab.set_status(f"Ключи с неопределённым контекстом {state}.")
 
     def _russian_straight_quotes_changed(self) -> None:
         previous = self.check_russian_straight_quotes
         self.check_russian_straight_quotes = (
-            self.russian_straight_quotes_var.get()
+            self.check_tab.russian_straight_quotes_var.get()
         )
         try:
             self._save_current_settings()
         except SettingsError as error:
             self.check_russian_straight_quotes = previous
-            self.russian_straight_quotes_var.set(previous)
+            self.check_tab.russian_straight_quotes_var.set(previous)
             messagebox.showerror(
                 "Настройка проверки кавычек не сохранена",
                 str(error),
             )
             return
-        state = (
-            "включена"
-            if self.check_russian_straight_quotes
-            else "выключена"
-        )
-        self.current_file_var.set(
+        state = "включена" if self.check_russian_straight_quotes else "выключена"
+        self.check_tab.set_status(
             f"Проверка прямых кавычек в русской локализации {state}."
         )
 
     def _notepad_window_mode_changed(self) -> None:
         previous = self.notepad_plus_plus_fullscreen
-        self.notepad_plus_plus_fullscreen = self.notepad_fullscreen_var.get()
+        self.notepad_plus_plus_fullscreen = self.check_tab.notepad_fullscreen_var.get()
         try:
             self._save_current_settings()
         except SettingsError as error:
             self.notepad_plus_plus_fullscreen = previous
-            self.notepad_fullscreen_var.set(previous)
+            self.check_tab.notepad_fullscreen_var.set(previous)
             messagebox.showerror(
                 "Режим окна Notepad++ не сохранён",
                 str(error),
@@ -1700,7 +1129,7 @@ class CheckerApplication:
             if self.notepad_plus_plus_fullscreen
             else "в обычном окне"
         )
-        self.current_file_var.set(f"Notepad++ будет открываться {mode}.")
+        self.check_tab.set_status(f"Notepad++ будет открываться {mode}.")
 
     def _remember_notepad_plus_plus(self, executable: Path) -> None:
         previous = self.notepad_plus_plus_path
@@ -1743,24 +1172,6 @@ class CheckerApplication:
         self._remember_notepad_plus_plus(executable.resolve())
         return executable.resolve()
 
-    def _open_double_clicked_diagnostic(self, event: tk.Event) -> str:
-        item = self.table.identify_row(event.y)
-        if not item:
-            return "break"
-        self.table.selection_set(item)
-        self.table.focus(item)
-        return self._open_selected_diagnostic()
-
-    def _open_selected_diagnostic(
-        self,
-        _event: object | None = None,
-    ) -> str:
-        diagnostic = self._selected_diagnostic()
-        return self._open_diagnostic(
-            diagnostic,
-            self.current_file_var,
-        )
-
     def _open_diagnostic(
         self,
         diagnostic: Diagnostic | None,
@@ -1784,7 +1195,7 @@ class CheckerApplication:
         selection_length = diagnostic.selection_length
         if (
             selection_length <= 0
-            and diagnostic.code in _GLYPH_DIAGNOSTIC_CODES
+            and diagnostic.code in GLYPH_DIAGNOSTIC_CODES
             and diagnostic.character
         ):
             selection_length = 1
@@ -1818,33 +1229,22 @@ class CheckerApplication:
 
     def _show_compare_editor_result(
         self,
-        opened: list[
-            tuple[ComparisonLanguage, Diagnostic, OpenResult]
-        ],
+        opened: list[tuple[ComparisonLanguage, Diagnostic, OpenResult]],
     ) -> None:
         labels = {
             "english": "английский",
             "russian": "русский",
         }
         if not opened:
-            self.compare_tab.status_var.set(
-                "Notepad++ не открыл ни одного файла."
-            )
+            self.compare_tab.status_var.set("Notepad++ не открыл ни одного файла.")
             return
-        opened_labels = " и ".join(
-            labels[language]
-            for language, _, _ in opened
-        )
+        opened_labels = " и ".join(labels[language] for language, _, _ in opened)
         if len(opened) == 1:
             _, diagnostic, result = opened[0]
-            location = (
-                f"{diagnostic.path}:"
-                f"{diagnostic.line}:{diagnostic.column}"
-            )
+            location = f"{diagnostic.path}:{diagnostic.line}:{diagnostic.column}"
             if result.exact_position_set:
                 self.compare_tab.status_var.set(
-                    f"Открыт {opened_labels} файл в Notepad++ "
-                    f"на позиции: {location}"
+                    f"Открыт {opened_labels} файл в Notepad++ на позиции: {location}"
                 )
             else:
                 self.compare_tab.status_var.set(
@@ -1863,19 +1263,14 @@ class CheckerApplication:
     def _show_compare_editor_failure(
         self,
         error: Exception,
-        opened: list[
-            tuple[ComparisonLanguage, Diagnostic, OpenResult]
-        ],
+        opened: list[tuple[ComparisonLanguage, Diagnostic, OpenResult]],
     ) -> None:
         if opened:
             self.compare_tab.status_var.set(
-                f"Открыто файлов: {len(opened)}; следующий файл "
-                "открыть не удалось."
+                f"Открыто файлов: {len(opened)}; следующий файл открыть не удалось."
             )
         else:
-            self.compare_tab.status_var.set(
-                "Файлы в Notepad++ открыть не удалось."
-            )
+            self.compare_tab.status_var.set("Файлы в Notepad++ открыть не удалось.")
         messagebox.showerror(
             "Не удалось открыть файл сравнения в Notepad++",
             str(error),
@@ -1887,46 +1282,16 @@ class CheckerApplication:
         result: OpenResult,
         status_var: tk.StringVar,
     ) -> None:
-        location = (
-            f"{diagnostic.path}:{diagnostic.line}:{diagnostic.column}"
-        )
+        location = f"{diagnostic.path}:{diagnostic.line}:{diagnostic.column}"
         if result.character_selected:
-            status_var.set(
-                f"Открыто в Notepad++; фрагмент выделен: {location}"
-            )
+            status_var.set(f"Открыто в Notepad++; фрагмент выделен: {location}")
         elif result.exact_position_set:
-            status_var.set(
-                f"Открыто в Notepad++ на позиции: {location}"
-            )
+            status_var.set(f"Открыто в Notepad++ на позиции: {location}")
         else:
             status_var.set(
                 f"Файл открыт в Notepad++ через строку и столбец: {location}. "
                 "Точное позиционирование через редактор не подтверждено."
             )
-
-    def _copy_selected_key(self, _event: object | None = None) -> str:
-        key = self._selected_key()
-        if not key:
-            self.root.bell()
-            return "break"
-        self.root.clipboard_clear()
-        self.root.clipboard_append(key)
-        self.root.update_idletasks()
-        self.current_file_var.set(f"Ключ скопирован: {key}")
-        return "break"
-
-    def _copy_selected_character(self, _event: object | None = None) -> str:
-        character = self._selected_character()
-        if not character:
-            self.root.bell()
-            return "break"
-        self.root.clipboard_clear()
-        self.root.clipboard_append(character)
-        self.root.update_idletasks()
-        self.current_file_var.set(
-            f"Символ скопирован: {character} (U+{ord(character):04X})"
-        )
-        return "break"
 
     @staticmethod
     def _exception_label(character: str) -> str:
@@ -1945,9 +1310,7 @@ class CheckerApplication:
 
     def _refresh_exceptions_ui(self) -> None:
         count = len(self.excluded_characters)
-        self.exceptions_button.configure(
-            text=f"Исключения… ({count})"
-        )
+        self.check_tab.set_exceptions_count(count)
         listbox = self.exceptions_listbox
         if listbox is None or not listbox.winfo_exists():
             return
@@ -1984,12 +1347,10 @@ class CheckerApplication:
             return False
 
         codes = ", ".join(
-            f"U+{ord(character):04X}"
-            for character in sorted(new_characters, key=ord)
+            f"U+{ord(character):04X}" for character in sorted(new_characters, key=ord)
         )
-        self.current_file_var.set(
-            f"Добавлено в исключения: {codes}. "
-            "Будет применено при следующей проверке."
+        self.check_tab.set_status(
+            f"Добавлено в исключения: {codes}. Будет применено при следующей проверке."
         )
         return True
 
@@ -2002,22 +1363,17 @@ class CheckerApplication:
             self.root.bell()
             return
 
-        removed = {
-            self.exception_list_characters[index]
-            for index in selected_indices
-        }
+        removed = {self.exception_list_characters[index] for index in selected_indices}
         previous = self.excluded_characters.copy()
         self.excluded_characters.difference_update(removed)
         if not self._save_exceptions(previous):
             return
 
         codes = ", ".join(
-            f"U+{ord(character):04X}"
-            for character in sorted(removed, key=ord)
+            f"U+{ord(character):04X}" for character in sorted(removed, key=ord)
         )
-        self.current_file_var.set(
-            f"Удалено из исключений: {codes}. "
-            "Будет применено при следующей проверке."
+        self.check_tab.set_status(
+            f"Удалено из исключений: {codes}. Будет применено при следующей проверке."
         )
 
     def _close_exceptions_dialog(self) -> None:
@@ -2108,46 +1464,11 @@ class CheckerApplication:
         entry.focus_set()
 
     def _add_selected_character_to_exceptions(self) -> None:
-        character = self._selected_character()
+        character = self.check_tab.selected_character()
         if not character or character in self.excluded_characters:
             self.root.bell()
             return
         self._add_excluded_text(character)
-
-    def _show_context_menu(self, event: tk.Event) -> None:
-        item = self.table.identify_row(event.y)
-        if not item:
-            return
-        self.table.selection_set(item)
-        self.table.focus(item)
-        diagnostic = self._selected_diagnostic()
-        self.context_menu.entryconfigure(
-            "Открыть в Notepad++",
-            state=(
-                tk.NORMAL
-                if diagnostic is not None and diagnostic.path.is_file()
-                else tk.DISABLED
-            ),
-        )
-        key = self._selected_key()
-        self.context_menu.entryconfigure(
-            "Копировать ключ",
-            state=tk.NORMAL if key else tk.DISABLED,
-        )
-        character = self._selected_character()
-        self.context_menu.entryconfigure(
-            "Копировать символ",
-            state=tk.NORMAL if character else tk.DISABLED,
-        )
-        self.context_menu.entryconfigure(
-            "Добавить символ в исключения",
-            state=(
-                tk.NORMAL
-                if character and character not in self.excluded_characters
-                else tk.DISABLED
-            ),
-        )
-        self.context_menu.tk_popup(event.x_root, event.y_root)
 
 
 def run_gui(app_root: Path) -> None:

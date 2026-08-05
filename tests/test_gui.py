@@ -34,8 +34,7 @@ class GuiTests(unittest.TestCase):
 
     def test_builds_all_tabs_with_safe_default_states(self) -> None:
         labels = [
-            self.app.notebook.tab(tab, "text")
-            for tab in self.app.notebook.tabs()
+            self.app.notebook.tab(tab, "text") for tab in self.app.notebook.tabs()
         ]
 
         self.assertEqual(
@@ -46,10 +45,10 @@ class GuiTests(unittest.TestCase):
             ],
             labels,
         )
-        self.assertTrue(self.app.russian_straight_quotes_var.get())
+        self.assertTrue(self.app.check_tab.russian_straight_quotes_var.get())
         self.assertEqual(
             "disabled",
-            str(self.app.export_button.cget("state")),
+            str(self.app.check_tab.export_button.cget("state")),
         )
         self.assertEqual(
             "disabled",
@@ -62,7 +61,7 @@ class GuiTests(unittest.TestCase):
 
     def test_export_buttons_follow_rows_and_busy_state(self) -> None:
         tables_and_buttons = (
-            (self.app.table, self.app.export_button),
+            (self.app.check_tab.table, self.app.check_tab.export_button),
             (self.app.layout_tab.table, self.app.layout_tab.export_button),
             (self.app.compare_tab.table, self.app.compare_tab.export_button),
         )
@@ -94,7 +93,7 @@ class GuiTests(unittest.TestCase):
         )
 
     def test_quote_option_is_saved_through_gui(self) -> None:
-        self.app.russian_straight_quotes_var.set(False)
+        self.app.check_tab.russian_straight_quotes_var.set(False)
         self.app._russian_straight_quotes_changed()
 
         settings = load_settings(self.app_root / "settings.json")
@@ -131,7 +130,7 @@ class GuiTests(unittest.TestCase):
             "TEST_KEY",
             'Описание; с "кавычками"',
         )
-        self.app.table.insert("", tk.END, values=values)
+        self.app.check_tab.table.insert("", tk.END, values=values)
 
         with patch.object(
             gui_module.filedialog,
@@ -139,9 +138,9 @@ class GuiTests(unittest.TestCase):
             return_value=str(destination),
         ):
             self.app._export_table_results(
-                self.app.table,
+                self.app.check_tab.table,
                 "test",
-                self.app.current_file_var,
+                self.app.check_tab.current_file_var,
             )
 
         with destination.open(
@@ -222,9 +221,7 @@ class GuiTests(unittest.TestCase):
     def test_progress_and_failure_events_restore_ui_state(self) -> None:
         current_path = self.app_root / "current.yml"
         self.app._set_busy(True)
-        self.app.tasks.post(
-            TaskProgress("localisation", 2, 5, current_path)
-        )
+        self.app.tasks.post(TaskProgress("localisation", 2, 5, current_path))
         self.app.tasks.post(
             TaskFailed("localisation", RuntimeError("simulated failure"))
         )
@@ -232,12 +229,18 @@ class GuiTests(unittest.TestCase):
         with patch.object(gui_module.messagebox, "showerror") as showerror:
             self.app._poll_events()
 
-        self.assertEqual(5, int(float(self.app.progress.cget("maximum"))))
-        self.assertEqual(2, int(float(self.app.progress.cget("value"))))
+        self.assertEqual(
+            5,
+            int(float(self.app.check_tab.progress.cget("maximum"))),
+        )
+        self.assertEqual(
+            2,
+            int(float(self.app.check_tab.progress.cget("value"))),
+        )
         self.assertFalse(self.app.busy)
         self.assertEqual(
             "Проверка завершилась внутренней ошибкой.",
-            self.app.summary_var.get(),
+            self.app.check_tab.summary_var.get(),
         )
         showerror.assert_called_once_with("Ошибка", "simulated failure")
 
