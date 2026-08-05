@@ -23,8 +23,8 @@ from .font_context import (
     mod_display_name,
 )
 from .font_profile import FontProfile, FontProfileError
+from .gui_compare_tab import ComparisonTab
 from .localisation_compare import (
-    ComparisonIssue,
     ComparisonLanguage,
     LocalisationComparator,
     LocalisationComparisonResult,
@@ -61,16 +61,6 @@ _PREVIEW_PRIORITY_LABELS = {
     "ru": "Всегда RU → EN",
     "en": "Всегда EN → RU",
 }
-_COMPARE_FILTER_LABELS = {
-    "Все проблемы": "all",
-    "Только отсутствующие ключи": "missing",
-    "Нет в русской": "missing_russian",
-    "Нет в английской": "missing_english",
-    "Только дубли": "duplicates",
-    "Только ошибки файлов": "parse_error",
-}
-
-
 class CheckerApplication:
     def __init__(self, root: tk.Tk, app_root: Path) -> None:
         self.root = root
@@ -81,9 +71,6 @@ class CheckerApplication:
         self.diagnostics_by_item: dict[str, Diagnostic] = {}
         self.layout_diagnostics_by_item: dict[str, Diagnostic] = {}
         self.layout_length_sort_descending = True
-        self.compare_issues_by_item: dict[str, ComparisonIssue] = {}
-        self.compare_all_issues: list[ComparisonIssue] = []
-        self.compare_key_sort_descending = False
         self.settings_path = settings_path_for(app_root)
         self.settings_error = ""
         self.exceptions_dialog: tk.Toplevel | None = None
@@ -1118,344 +1105,16 @@ class CheckerApplication:
         self._refresh_focus_preview_ui()
 
     def _build_compare_tab(self) -> None:
-        outer = ttk.Frame(self.notebook, padding=12)
-        self.notebook.add(outer, text="Сравнение ключей")
-
-        controls = ttk.Frame(outer)
-        controls.pack(fill=tk.X)
-        self.compare_run_button = ttk.Button(
-            controls,
-            text="Сравнить локализации",
-            command=self._start_localisation_comparison,
-        )
-        self.compare_run_button.pack(side=tk.LEFT)
-        self.compare_clear_button = ttk.Button(
-            controls,
-            text="Очистить результаты",
-            command=self._clear_compare_results,
-        )
-        self.compare_clear_button.pack(side=tk.LEFT, padx=(8, 0))
-        self.compare_copy_key_button = ttk.Button(
-            controls,
-            text="Копировать ключ",
-            command=self._copy_compare_selected_key,
-            state=tk.DISABLED,
-        )
-        self.compare_copy_key_button.pack(side=tk.LEFT, padx=(8, 0))
-        self.compare_export_button = ttk.Button(
-            controls,
-            text="Выгрузить результаты…",
-            command=lambda: self._export_table_results(
-                self.compare_table,
-                "key_comparison",
-                self.compare_status_var,
-            ),
-            state=tk.DISABLED,
-        )
-        self.compare_export_button.pack(side=tk.LEFT, padx=(8, 0))
-        self.compare_summary_var = tk.StringVar(
-            value="Укажите папку мода и запустите сравнение."
-        )
-        ttk.Label(
-            controls,
-            textvariable=self.compare_summary_var,
-        ).pack(side=tk.LEFT, padx=(18, 0))
-
-        settings_frame = ttk.LabelFrame(
-            outer,
-            text="Сравнение английской и русской локализаций",
-            padding=(10, 8),
-        )
-        settings_frame.pack(fill=tk.X, pady=(10, 0))
-        settings_frame.columnconfigure(1, weight=1)
-        ttk.Label(
-            settings_frame,
-            text="Папка английской локализации:",
-        ).grid(row=0, column=0, sticky=tk.W)
-        self.compare_english_path_var = tk.StringVar()
-        ttk.Label(
-            settings_frame,
-            textvariable=self.compare_english_path_var,
-            anchor=tk.W,
-        ).grid(row=0, column=1, sticky="ew", padx=(8, 8))
-        self.compare_english_path_button = ttk.Button(
-            settings_frame,
-            text="Выбрать…",
-            command=lambda: self._select_compare_folder("english"),
-        )
-        self.compare_english_path_button.grid(
-            row=0,
-            column=2,
-            sticky=tk.E,
-        )
-        ttk.Label(
-            settings_frame,
-            text="Папка русской локализации:",
-        ).grid(row=1, column=0, sticky=tk.W, pady=(8, 0))
-        self.compare_russian_path_var = tk.StringVar()
-        ttk.Label(
-            settings_frame,
-            textvariable=self.compare_russian_path_var,
-            anchor=tk.W,
-        ).grid(
-            row=1,
-            column=1,
-            sticky="ew",
-            padx=(8, 8),
-            pady=(8, 0),
-        )
-        self.compare_russian_path_button = ttk.Button(
-            settings_frame,
-            text="Выбрать…",
-            command=lambda: self._select_compare_folder("russian"),
-        )
-        self.compare_russian_path_button.grid(
-            row=1,
-            column=2,
-            sticky=tk.E,
-            pady=(8, 0),
-        )
-        ttk.Label(
-            settings_frame,
-            text=(
-                "Обе папки проверяются рекурсивно. В английской части "
-                "учитываются записи под l_english:, в русской — под "
-                "l_russian:. Папки могут находиться где угодно."
-            ),
-            justify=tk.LEFT,
-        ).grid(
-            row=2,
-            column=0,
-            columnspan=3,
-            sticky=tk.W,
-            pady=(8, 0),
-        )
-
-        filter_frame = ttk.Frame(outer)
-        filter_frame.pack(fill=tk.X, pady=(10, 0))
-        ttk.Label(filter_frame, text="Показывать:").pack(side=tk.LEFT)
-        self.compare_filter_var = tk.StringVar(value="Все проблемы")
-        self.compare_filter_combo = ttk.Combobox(
-            filter_frame,
-            textvariable=self.compare_filter_var,
-            values=tuple(_COMPARE_FILTER_LABELS),
-            state="readonly",
-            width=30,
-        )
-        self.compare_filter_combo.pack(side=tk.LEFT, padx=(8, 0))
-        self.compare_filter_combo.bind(
-            "<<ComboboxSelected>>",
-            self._apply_compare_filter,
-        )
-        self.compare_visible_var = tk.StringVar(value="")
-        ttk.Label(
-            filter_frame,
-            textvariable=self.compare_visible_var,
-        ).pack(side=tk.LEFT, padx=(16, 0))
-        self.compare_open_both_button = ttk.Button(
-            filter_frame,
-            text="Открыть оба",
-            command=lambda: self._open_compare_selected_languages(
-                ("english", "russian")
-            ),
-            state=tk.DISABLED,
-        )
-        self.compare_open_both_button.pack(side=tk.RIGHT)
-        self.compare_open_russian_button = ttk.Button(
-            filter_frame,
-            text="Открыть русский",
-            command=lambda: self._open_compare_selected_languages(
-                ("russian",)
-            ),
-            state=tk.DISABLED,
-        )
-        self.compare_open_russian_button.pack(
-            side=tk.RIGHT,
-            padx=(0, 8),
-        )
-        self.compare_open_english_button = ttk.Button(
-            filter_frame,
-            text="Открыть английский",
-            command=lambda: self._open_compare_selected_languages(
-                ("english",)
-            ),
-            state=tk.DISABLED,
-        )
-        self.compare_open_english_button.pack(
-            side=tk.RIGHT,
-            padx=(0, 8),
-        )
-
-        self.compare_progress = ttk.Progressbar(
-            outer,
-            mode="determinate",
-        )
-        self.compare_progress.pack(fill=tk.X, pady=(10, 4))
-        self.compare_status_var = tk.StringVar(
-            value="Сравнение ещё не запускалось."
-        )
-        ttk.Label(
-            outer,
-            textvariable=self.compare_status_var,
-            anchor=tk.W,
-        ).pack(fill=tk.X, pady=(0, 8))
-
-        table_frame = ttk.Frame(outer)
-        table_frame.pack(fill=tk.BOTH, expand=True)
-        columns = (
-            "problem",
-            "code",
-            "key",
-            "language",
-            "file",
-            "line",
-            "column",
-            "value",
-            "message",
-        )
-        self.compare_table = ttk.Treeview(
-            table_frame,
-            columns=columns,
-            show="headings",
-            selectmode="browse",
-        )
-        headings = {
-            "problem": "Различие",
-            "code": "Код",
-            "key": "Ключ",
-            "language": "Существующая запись",
-            "file": "Файл",
-            "line": "Строка",
-            "column": "Столбец",
-            "value": "Значение",
-            "message": "Описание",
-        }
-        widths = {
-            "problem": 155,
-            "code": 190,
-            "key": 240,
-            "language": 150,
-            "file": 340,
-            "line": 65,
-            "column": 70,
-            "value": 320,
-            "message": 480,
-        }
-        for column in columns:
-            self.compare_table.heading(
-                column,
-                text=headings[column],
-            )
-            self.compare_table.column(
-                column,
-                width=widths[column],
-                minwidth=50,
-                stretch=column in {"key", "file", "value", "message"},
-                anchor=tk.W,
-            )
-        self.compare_table.heading(
-            "key",
-            text="Ключ ↕",
-            command=self._sort_compare_by_key,
-        )
-
-        vertical = ttk.Scrollbar(
-            table_frame,
-            orient=tk.VERTICAL,
-            command=self.compare_table.yview,
-        )
-        horizontal = ttk.Scrollbar(
-            table_frame,
-            orient=tk.HORIZONTAL,
-            command=self.compare_table.xview,
-        )
-        self.compare_table.configure(
-            yscrollcommand=vertical.set,
-            xscrollcommand=horizontal.set,
-        )
-        self.compare_table.grid(row=0, column=0, sticky="nsew")
-        vertical.grid(row=0, column=1, sticky="ns")
-        horizontal.grid(row=1, column=0, sticky="ew")
-        table_frame.rowconfigure(0, weight=1)
-        table_frame.columnconfigure(0, weight=1)
-        self.compare_table.tag_configure(
-            "missing",
-            foreground="#9A6700",
-        )
-        self.compare_table.tag_configure(
-            "duplicate",
-            foreground="#7A4E00",
-        )
-        self.compare_table.tag_configure(
-            "error",
-            foreground="#B00020",
-        )
-
-        detail_frame = ttk.LabelFrame(
-            outer,
-            text=(
-                "Полное сообщение — двойной щелчок позволяет выбрать "
-                "английский, русский или оба файла"
-            ),
-            padding=6,
-        )
-        detail_frame.pack(fill=tk.X, pady=(10, 0))
-        self.compare_detail_var = tk.StringVar(value="")
-        ttk.Label(
-            detail_frame,
-            textvariable=self.compare_detail_var,
-            anchor=tk.W,
-            justify=tk.LEFT,
-            wraplength=1120,
-        ).pack(fill=tk.X)
-
-        self.compare_table.bind(
-            "<<TreeviewSelect>>",
-            self._show_compare_selected_detail,
-        )
-        self.compare_table.bind(
-            "<Control-c>",
-            self._copy_compare_selected_key,
-        )
-        self.compare_table.bind(
-            "<Control-C>",
-            self._copy_compare_selected_key,
-        )
-        self.compare_table.bind(
-            "<Double-1>",
-            self._open_double_clicked_compare_issue,
-        )
-        self.compare_table.bind(
-            "<Button-3>",
-            self._show_compare_context_menu,
-        )
-        self.compare_context_menu = tk.Menu(self.root, tearoff=False)
-        self.compare_context_menu.add_command(
-            label="Открыть английский файл",
-            command=lambda: self._open_compare_selected_languages(
-                ("english",)
-            ),
-        )
-        self.compare_context_menu.add_command(
-            label="Открыть русский файл",
-            command=lambda: self._open_compare_selected_languages(
-                ("russian",)
-            ),
-        )
-        self.compare_context_menu.add_command(
-            label="Открыть оба файла",
-            command=lambda: self._open_compare_selected_languages(
-                ("english", "russian")
-            ),
-        )
-        self.compare_context_menu.add_separator()
-        self.compare_context_menu.add_command(
-            label="Копировать ключ",
-            command=self._copy_compare_selected_key,
+        self.compare_tab = ComparisonTab(
+            root=self.root,
+            notebook=self.notebook,
+            on_run=self._start_localisation_comparison,
+            on_select_folder=self._select_compare_folder,
+            on_open_languages=self._open_compare_selected_languages,
+            on_export=self._export_table_results,
         )
         self._refresh_compare_paths_ui()
         self._refresh_compare_controls()
-
     def _choose_file(self) -> None:
         selected = filedialog.askopenfilename(
             title="Выберите файл локализации",
@@ -1579,28 +1238,10 @@ class CheckerApplication:
         return self._select_focus_preview_cli()
 
     def _refresh_compare_paths_ui(self) -> None:
-        for raw_path, variable, label in (
-            (
+        if hasattr(self, "compare_tab"):
+            self.compare_tab.set_paths(
                 self.compare_english_path,
-                self.compare_english_path_var,
-                "английская",
-            ),
-            (
                 self.compare_russian_path,
-                self.compare_russian_path_var,
-                "русская",
-            ),
-        ):
-            if not raw_path:
-                variable.set(
-                    f"не выбрана — {label} папка обязательна"
-                )
-                continue
-            path = Path(raw_path)
-            variable.set(
-                str(path)
-                if path.is_dir()
-                else f"папка недоступна: {path}"
             )
 
     def _select_compare_folder(self, language: str) -> Path | None:
@@ -1641,7 +1282,7 @@ class CheckerApplication:
             )
             return None
         self._refresh_compare_paths_ui()
-        self.compare_status_var.set(
+        self.compare_tab.status_var.set(
             "Папка для сравнения выбрана: "
             f"{path}"
         )
@@ -1889,19 +1530,8 @@ class CheckerApplication:
         )
 
     def _refresh_compare_controls(self) -> None:
-        if not hasattr(self, "compare_run_button"):
-            return
-        state = tk.DISABLED if self.busy else tk.NORMAL
-        self.compare_run_button.configure(state=state)
-        self.compare_clear_button.configure(state=state)
-        self.compare_english_path_button.configure(state=state)
-        self.compare_russian_path_button.configure(state=state)
-        self.compare_filter_combo.configure(
-            state=tk.DISABLED if self.busy else "readonly"
-        )
-        self._refresh_compare_open_controls(
-            self._compare_selected_issue()
-        )
+        if hasattr(self, "compare_tab"):
+            self.compare_tab.set_busy(self.busy)
 
     def _refresh_context_mod_ui(self) -> None:
         if not self.context_mod_path:
@@ -2070,7 +1700,6 @@ class CheckerApplication:
         controls = (
             (self.export_button, self.table),
             (self.layout_export_button, self.layout_table),
-            (self.compare_export_button, self.compare_table),
         )
         for button, table in controls:
             has_rows = bool(table.get_children(""))
@@ -2081,6 +1710,8 @@ class CheckerApplication:
                     else tk.DISABLED
                 )
             )
+        if hasattr(self, "compare_tab"):
+            self.compare_tab.refresh_export_control()
 
     def _clear_results(self) -> None:
         for item in self.table.get_children():
@@ -2109,40 +1740,20 @@ class CheckerApplication:
         self.layout_copy_key_button.configure(state=tk.DISABLED)
         self._refresh_export_controls()
 
-    def _clear_compare_results(self) -> None:
-        for item in self.compare_table.get_children():
-            self.compare_table.delete(item)
-        self.compare_issues_by_item.clear()
-        self.compare_all_issues.clear()
-        self.compare_summary_var.set("Результаты очищены.")
-        self.compare_visible_var.set("")
-        self.compare_status_var.set(
-            "Укажите папку мода и запустите сравнение."
-        )
-        self.compare_detail_var.set("")
-        self.compare_progress.configure(value=0, maximum=1)
-        self.compare_copy_key_button.configure(state=tk.DISABLED)
-        self._refresh_compare_open_controls(None)
-        self._refresh_export_controls()
-
     def _start_localisation_comparison(self) -> None:
         if self.worker is not None and self.worker.is_alive():
             return
 
         folders = self._require_compare_folders()
         if folders is None:
-            self.compare_status_var.set(
+            self.compare_tab.status_var.set(
                 "Сравнение отменено: обе папки обязательны."
             )
             return
         english_root, russian_root = folders
 
-        self._clear_compare_results()
+        self.compare_tab.prepare_comparison(english_root, russian_root)
         self._set_busy(True)
-        self.compare_summary_var.set("Чтение файлов локализации…")
-        self.compare_status_var.set(
-            f"EN: {english_root}; RU: {russian_root}"
-        )
 
         def progress(current: int, total: int, path: Path) -> None:
             self.events.put(
@@ -2373,21 +1984,19 @@ class CheckerApplication:
                     messagebox.showerror("Ошибка", str(payload))
                 elif event == "compare_progress":
                     current, total, path = payload
-                    self.compare_progress.configure(
-                        maximum=total,
-                        value=current,
+                    self.compare_tab.update_progress(
+                        cast(int, current),
+                        cast(int, total),
+                        cast(Path, path),
                     )
-                    self.compare_status_var.set(str(path))
                 elif event == "compare_result":
-                    self._show_compare_result(
+                    self.compare_tab.show_result(
                         cast(LocalisationComparisonResult, payload)
                     )
                     self._set_busy(False)
                 elif event == "compare_failure":
                     self._set_busy(False)
-                    self.compare_summary_var.set(
-                        "Сравнение завершилось внутренней ошибкой."
-                    )
+                    self.compare_tab.show_failure()
                     messagebox.showerror(
                         "Ошибка сравнения локализаций",
                         str(payload),
@@ -2546,317 +2155,11 @@ class CheckerApplication:
             )
         self._refresh_export_controls()
 
-    def _show_compare_result(
-        self,
-        result: LocalisationComparisonResult,
-    ) -> None:
-        self.compare_summary_var.set(
-            f"Файлов: {result.files_checked} "
-            f"(EN: {result.english_files}, RU: {result.russian_files}); "
-            f"уникальных ключей EN: {result.english_keys}, "
-            f"RU: {result.russian_keys}; совпадают: {result.common_keys}."
-        )
-        self.compare_status_var.set(
-            f"Сравнение завершено: нет в русской — "
-            f"{result.missing_russian}; нет в английской — "
-            f"{result.missing_english}; дублей — "
-            f"{result.duplicate_count}; ошибок разбора — "
-            f"{result.parse_errors}."
-        )
-        self.compare_progress.configure(
-            maximum=max(result.files_checked, 1),
-            value=result.files_checked,
-        )
-        self.compare_all_issues = list(result.issues)
-        self._apply_compare_filter()
-
-    @staticmethod
-    def _comparison_issue_matches(
-        issue: ComparisonIssue,
-        selected_filter: str,
-    ) -> bool:
-        if selected_filter == "all":
-            return True
-        if selected_filter == "missing":
-            return issue.category in {
-                "missing_russian",
-                "missing_english",
-            }
-        if selected_filter == "duplicates":
-            return issue.category in {
-                "duplicate_english",
-                "duplicate_russian",
-            }
-        return issue.category == selected_filter
-
-    def _apply_compare_filter(
-        self,
-        _event: object | None = None,
-    ) -> str:
-        selected_filter = _COMPARE_FILTER_LABELS.get(
-            self.compare_filter_var.get(),
-            "all",
-        )
-        for item in self.compare_table.get_children():
-            self.compare_table.delete(item)
-        self.compare_issues_by_item.clear()
-        self.compare_copy_key_button.configure(state=tk.DISABLED)
-        self._refresh_compare_open_controls(None)
-        self.compare_detail_var.set("")
-
-        visible = [
-            issue
-            for issue in self.compare_all_issues
-            if self._comparison_issue_matches(
-                issue,
-                selected_filter,
-            )
-        ]
-        for issue in visible:
-            self._insert_compare_issue(issue)
-        self.compare_visible_var.set(
-            f"Показано: {len(visible)} из {len(self.compare_all_issues)}"
-        )
-        if not visible and self.compare_all_issues:
-            self.compare_detail_var.set(
-                "Для выбранного фильтра результатов нет."
-            )
-        elif not self.compare_all_issues:
-            self.compare_detail_var.set(
-                "Различий, дублей и ошибок разбора не обнаружено."
-            )
-        self._refresh_export_controls()
-        return "break"
-
-    @staticmethod
-    def _comparison_value_preview(value: str) -> str:
-        normalized = value.replace("\r", " ").replace("\n", " ")
-        if len(normalized) <= 180:
-            return normalized
-        return normalized[:177] + "…"
-
-    def _insert_compare_issue(self, issue: ComparisonIssue) -> None:
-        if issue.category == "parse_error":
-            tag = "error"
-        elif issue.category.startswith("duplicate_"):
-            tag = "duplicate"
-        else:
-            tag = "missing"
-        item = self.compare_table.insert(
-            "",
-            tk.END,
-            values=(
-                issue.label,
-                issue.code,
-                issue.key,
-                issue.language,
-                str(issue.path),
-                issue.line,
-                issue.column,
-                self._comparison_value_preview(issue.raw_value),
-                issue.message,
-            ),
-            tags=(tag,),
-        )
-        self.compare_issues_by_item[item] = issue
-
-    def _sort_compare_by_key(self) -> None:
-        descending = self.compare_key_sort_descending
-        rows = [
-            (
-                item,
-                self.compare_issues_by_item.get(item),
-            )
-            for item in self.compare_table.get_children("")
-        ]
-
-        def sort_key(
-            row: tuple[str, ComparisonIssue | None],
-        ) -> tuple[str, str, int]:
-            issue = row[1]
-            if issue is None:
-                return "", "", 0
-            return (
-                issue.key.casefold(),
-                str(issue.path).casefold(),
-                issue.line,
-            )
-
-        rows.sort(key=sort_key, reverse=descending)
-        rows.sort(
-            key=lambda row: not bool(
-                row[1] is not None and row[1].key
-            )
-        )
-        for position, (item, _) in enumerate(rows):
-            self.compare_table.move(item, "", position)
-        self.compare_table.heading(
-            "key",
-            text="Ключ ↓" if descending else "Ключ ↑",
-            command=self._sort_compare_by_key,
-        )
-        self.compare_key_sort_descending = not descending
-
-    def _compare_selected_issue(self) -> ComparisonIssue | None:
-        selected = self.compare_table.selection()
-        if not selected:
-            return None
-        return self.compare_issues_by_item.get(selected[0])
-
-    def _show_compare_selected_detail(
-        self,
-        _event: object | None = None,
-    ) -> None:
-        issue = self._compare_selected_issue()
-        self.compare_copy_key_button.configure(
-            state=(
-                tk.NORMAL
-                if issue is not None and issue.key
-                else tk.DISABLED
-            )
-        )
-        self._refresh_compare_open_controls(issue)
-        if issue is None:
-            return
-        value = (
-            f" Значение: {issue.raw_value}"
-            if issue.raw_value
-            else ""
-        )
-        self.compare_detail_var.set(
-            f"{issue.path}:{issue.line}:{issue.column} — "
-            f"{issue.message}{value}"
-        )
-
-    def _copy_compare_selected_key(
-        self,
-        _event: object | None = None,
-    ) -> str:
-        issue = self._compare_selected_issue()
-        if issue is None or not issue.key:
-            self.root.bell()
-            return "break"
-        self.root.clipboard_clear()
-        self.root.clipboard_append(issue.key)
-        self.root.update_idletasks()
-        self.compare_status_var.set(f"Ключ скопирован: {issue.key}")
-        return "break"
-
-    @staticmethod
-    def _compare_language_available(
-        issue: ComparisonIssue | None,
-        language: ComparisonLanguage,
-    ) -> bool:
-        if issue is None:
-            return False
-        diagnostic = issue.diagnostic_for(language)
-        return (
-            diagnostic is not None
-            and diagnostic.path.is_file()
-        )
-
-    def _refresh_compare_open_controls(
-        self,
-        issue: ComparisonIssue | None,
-    ) -> None:
-        if not hasattr(self, "compare_open_english_button"):
-            return
-        english_available = (
-            not self.busy
-            and self._compare_language_available(issue, "english")
-        )
-        russian_available = (
-            not self.busy
-            and self._compare_language_available(issue, "russian")
-        )
-        self.compare_open_english_button.configure(
-            state=tk.NORMAL if english_available else tk.DISABLED
-        )
-        self.compare_open_russian_button.configure(
-            state=tk.NORMAL if russian_available else tk.DISABLED
-        )
-        self.compare_open_both_button.configure(
-            state=(
-                tk.NORMAL
-                if english_available and russian_available
-                else tk.DISABLED
-            )
-        )
-
-    def _popup_compare_context_menu(
-        self,
-        event: tk.Event,
-        issue: ComparisonIssue | None,
-    ) -> str:
-        english_available = self._compare_language_available(
-            issue,
-            "english",
-        )
-        russian_available = self._compare_language_available(
-            issue,
-            "russian",
-        )
-        self.compare_context_menu.entryconfigure(
-            "Открыть английский файл",
-            state=tk.NORMAL if english_available else tk.DISABLED,
-        )
-        self.compare_context_menu.entryconfigure(
-            "Открыть русский файл",
-            state=tk.NORMAL if russian_available else tk.DISABLED,
-        )
-        self.compare_context_menu.entryconfigure(
-            "Открыть оба файла",
-            state=(
-                tk.NORMAL
-                if english_available and russian_available
-                else tk.DISABLED
-            ),
-        )
-        self.compare_context_menu.entryconfigure(
-            "Копировать ключ",
-            state=(
-                tk.NORMAL
-                if issue is not None and issue.key
-                else tk.DISABLED
-            ),
-        )
-        try:
-            self.compare_context_menu.tk_popup(
-                event.x_root,
-                event.y_root,
-            )
-        finally:
-            self.compare_context_menu.grab_release()
-        return "break"
-
-    def _show_compare_context_menu(self, event: tk.Event) -> str:
-        item = self.compare_table.identify_row(event.y)
-        if not item:
-            return "break"
-        self.compare_table.selection_set(item)
-        self.compare_table.focus(item)
-        issue = self.compare_issues_by_item.get(item)
-        self._show_compare_selected_detail()
-        return self._popup_compare_context_menu(event, issue)
-
-    def _open_double_clicked_compare_issue(
-        self,
-        event: tk.Event,
-    ) -> str:
-        item = self.compare_table.identify_row(event.y)
-        if not item:
-            return "break"
-        self.compare_table.selection_set(item)
-        self.compare_table.focus(item)
-        issue = self.compare_issues_by_item.get(item)
-        self._show_compare_selected_detail()
-        return self._popup_compare_context_menu(event, issue)
-
     def _open_compare_selected_languages(
         self,
         languages: tuple[ComparisonLanguage, ...],
     ) -> str:
-        issue = self._compare_selected_issue()
+        issue = self.compare_tab.selected_issue()
         diagnostics: list[tuple[ComparisonLanguage, Diagnostic]] = []
         if issue is not None:
             for language in languages:
@@ -2872,7 +2175,7 @@ class CheckerApplication:
 
         executable = self._resolve_notepad_plus_plus()
         if executable is None:
-            self.compare_status_var.set(
+            self.compare_tab.status_var.set(
                 "Открытие в Notepad++ отменено."
             )
             return "break"
@@ -2885,7 +2188,7 @@ class CheckerApplication:
             labels[language]
             for language, _ in diagnostics
         )
-        self.compare_status_var.set(
+        self.compare_tab.status_var.set(
             f"Открывается {requested} файл в Notepad++…"
         )
         fullscreen = self.notepad_plus_plus_fullscreen
@@ -3377,7 +2680,7 @@ class CheckerApplication:
             "russian": "русский",
         }
         if not opened:
-            self.compare_status_var.set(
+            self.compare_tab.status_var.set(
                 "Notepad++ не открыл ни одного файла."
             )
             return
@@ -3392,18 +2695,18 @@ class CheckerApplication:
                 f"{diagnostic.line}:{diagnostic.column}"
             )
             if result.exact_position_set:
-                self.compare_status_var.set(
+                self.compare_tab.status_var.set(
                     f"Открыт {opened_labels} файл в Notepad++ "
                     f"на позиции: {location}"
                 )
             else:
-                self.compare_status_var.set(
+                self.compare_tab.status_var.set(
                     f"Открыт {opened_labels} файл в Notepad++: "
                     f"{location}. Точная позиция не подтверждена."
                 )
             return
         active_language, active_diagnostic, _ = opened[-1]
-        self.compare_status_var.set(
+        self.compare_tab.status_var.set(
             f"Открыты {opened_labels} файлы в Notepad++; "
             f"активен {labels[active_language]}: "
             f"{active_diagnostic.path}:"
@@ -3418,12 +2721,12 @@ class CheckerApplication:
         ],
     ) -> None:
         if opened:
-            self.compare_status_var.set(
+            self.compare_tab.status_var.set(
                 f"Открыто файлов: {len(opened)}; следующий файл "
                 "открыть не удалось."
             )
         else:
-            self.compare_status_var.set(
+            self.compare_tab.status_var.set(
                 "Файлы в Notepad++ открыть не удалось."
             )
         messagebox.showerror(

@@ -10,7 +10,11 @@ from unittest.mock import patch
 
 from hoi4_l10n_checker import gui as gui_module
 from hoi4_l10n_checker.gui import CheckerApplication
-from hoi4_l10n_checker.localisation_compare import ComparisonIssue
+from hoi4_l10n_checker.gui_compare_tab import FILTER_LABELS
+from hoi4_l10n_checker.localisation_compare import (
+    ComparisonIssue,
+    LocalisationComparisonResult,
+)
 from hoi4_l10n_checker.settings import load_settings
 
 
@@ -52,14 +56,14 @@ class GuiTests(unittest.TestCase):
         )
         self.assertEqual(
             "disabled",
-            str(self.app.compare_export_button.cget("state")),
+            str(self.app.compare_tab.export_button.cget("state")),
         )
 
     def test_export_buttons_follow_rows_and_busy_state(self) -> None:
         tables_and_buttons = (
             (self.app.table, self.app.export_button),
             (self.app.layout_table, self.app.layout_export_button),
-            (self.app.compare_table, self.app.compare_export_button),
+            (self.app.compare_tab.table, self.app.compare_tab.export_button),
         )
         for table, _ in tables_and_buttons:
             table.insert("", tk.END, values=("test",))
@@ -143,23 +147,61 @@ class GuiTests(unittest.TestCase):
             self._comparison_issue("missing_russian", "B_KEY", 10),
             self._comparison_issue("missing_russian", "A_KEY", 30),
         ]
-        self.app.compare_all_issues = issues
+        self.app.compare_tab.all_issues = issues
         missing_russian_label = next(
             label
-            for label, value in gui_module._COMPARE_FILTER_LABELS.items()
+            for label, value in FILTER_LABELS.items()
             if value == "missing_russian"
         )
-        self.app.compare_filter_var.set(missing_russian_label)
+        self.app.compare_tab.filter_var.set(missing_russian_label)
 
-        self.app._apply_compare_filter()
-        self.assertEqual(2, len(self.app.compare_table.get_children("")))
+        self.app.compare_tab.apply_filter()
+        self.assertEqual(
+            2,
+            len(self.app.compare_tab.table.get_children("")),
+        )
 
-        self.app._sort_compare_by_key()
+        self.app.compare_tab.sort_by_key()
         visible_keys = [
-            self.app.compare_table.set(item, "key")
-            for item in self.app.compare_table.get_children("")
+            self.app.compare_tab.table.set(item, "key")
+            for item in self.app.compare_tab.table.get_children("")
         ]
         self.assertEqual(["A_KEY", "B_KEY"], visible_keys)
+
+    def test_compare_tab_presents_completed_result(self) -> None:
+        issue = self._comparison_issue("missing_russian", "TEST_KEY", 10)
+        result = LocalisationComparisonResult(
+            english_root=self.app_root / "english",
+            russian_root=self.app_root / "russian",
+            files_checked=4,
+            english_files=2,
+            russian_files=2,
+            english_keys=20,
+            russian_keys=19,
+            common_keys=19,
+            missing_russian=1,
+            missing_english=0,
+            duplicate_english=0,
+            duplicate_russian=0,
+            parse_errors=0,
+            issues=[issue],
+        )
+
+        self.app.compare_tab.show_result(result)
+
+        self.assertIn("Файлов: 4", self.app.compare_tab.summary_var.get())
+        self.assertIn(
+            "нет в русской — 1",
+            self.app.compare_tab.status_var.get(),
+        )
+        self.assertEqual(
+            1,
+            len(self.app.compare_tab.table.get_children("")),
+        )
+        self.assertEqual(
+            "normal",
+            str(self.app.compare_tab.export_button.cget("state")),
+        )
 
     def test_progress_and_failure_events_restore_ui_state(self) -> None:
         current_path = self.app_root / "current.yml"
