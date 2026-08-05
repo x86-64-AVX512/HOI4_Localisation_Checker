@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import tkinter as tk
-import unicodedata
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
@@ -32,6 +31,7 @@ from .font_profile import FontProfile, FontProfileError
 from .gui_check_tab import LocalisationCheckTab
 from .gui_compare_tab import ComparisonTab
 from .gui_editor import NotepadPlusPlusController
+from .gui_exceptions import CharacterExceptionsController
 from .gui_layout_tab import TextLayoutTab
 from .localisation_compare import (
     ComparisonLanguage,
@@ -61,13 +61,9 @@ class CheckerApplication:
         self.busy = False
         self.settings_path = settings_path_for(app_root)
         self.settings_error = ""
-        self.exceptions_dialog: tk.Toplevel | None = None
-        self.exceptions_listbox: tk.Listbox | None = None
-        self.exception_list_characters: list[str] = []
-
         try:
             settings = load_settings(self.settings_path)
-            self.excluded_characters = set(settings.excluded_characters)
+            excluded_characters = settings.excluded_characters
             self.notepad_plus_plus_path = settings.notepad_plus_plus_path
             self.notepad_plus_plus_fullscreen = settings.notepad_plus_plus_fullscreen
             self.context_mod_path = settings.context_mod_path
@@ -87,7 +83,7 @@ class CheckerApplication:
             self.compare_russian_path = settings.compare_russian_path
             self.export_directory = settings.export_directory
         except SettingsError as error:
-            self.excluded_characters: set[str] = set()
+            excluded_characters = frozenset()
             self.notepad_plus_plus_path = ""
             self.notepad_plus_plus_fullscreen = False
             self.context_mod_path = ""
@@ -125,6 +121,14 @@ class CheckerApplication:
         self.checker = LocalisationChecker(self.font_profile)
         self.text_layout_checker = TextLayoutChecker()
         self.localisation_comparator = LocalisationComparator()
+        self.exceptions = CharacterExceptionsController(
+            root=self.root,
+            characters=excluded_characters,
+            persist=self._save_current_settings,
+            set_count=lambda count: self.check_tab.set_exceptions_count(count),
+            set_status=lambda status: self.check_tab.set_status(status),
+            selected_character=lambda: self.check_tab.selected_character(),
+        )
         self.editor = NotepadPlusPlusController(
             root=self.root,
             tasks=self.tasks,
@@ -168,17 +172,17 @@ class CheckerApplication:
             notepad_fullscreen=self.notepad_plus_plus_fullscreen,
             on_choose_file=self._choose_file,
             on_choose_folder=self._choose_folder,
-            on_open_exceptions=self._open_exceptions_dialog,
+            on_open_exceptions=self.exceptions.open_dialog,
             on_select_context_mod=self._select_context_mod,
             on_unknown_context_changed=self._unknown_context_visibility_changed,
             on_russian_quotes_changed=self._russian_straight_quotes_changed,
             on_notepad_mode_changed=self._notepad_window_mode_changed,
             on_open_diagnostic=self.editor.open_diagnostic,
-            on_add_selected_exception=(self._add_selected_character_to_exceptions),
-            is_character_excluded=self.excluded_characters.__contains__,
+            on_add_selected_exception=self.exceptions.add_selected_character,
+            is_character_excluded=self.exceptions.contains,
             on_export=self._export_table_results,
         )
-        self._refresh_exceptions_ui()
+        self.exceptions.refresh()
         self._refresh_context_mod_ui()
         self._build_layout_tab()
         self._build_compare_tab()
@@ -683,7 +687,7 @@ class CheckerApplication:
                 return
             context_game_root = self._resolve_hoi4_install()
 
-        excluded_characters = frozenset(self.excluded_characters)
+        excluded_characters = self.exceptions.characters
         show_unknown_context_warnings = self.show_unknown_context_warnings
         check_russian_straight_quotes = self.check_russian_straight_quotes
         if glyph_mode == "contextual":
@@ -903,7 +907,7 @@ class CheckerApplication:
         save_settings(
             self.settings_path,
             AppSettings(
-                excluded_characters=frozenset(self.excluded_characters),
+                excluded_characters=self.exceptions.characters,
                 notepad_plus_plus_path=self.notepad_plus_plus_path,
                 notepad_plus_plus_fullscreen=self.notepad_plus_plus_fullscreen,
                 context_mod_path=self.context_mod_path,
@@ -1051,184 +1055,6 @@ class CheckerApplication:
                 "Путь к Notepad++ не сохранён",
                 str(error),
             )
-
-    @staticmethod
-    def _exception_label(character: str) -> str:
-        if character == " ":
-            display = "обычный пробел"
-        elif character == "\u00a0":
-            display = "неразрывный пробел"
-        elif character == "\u200b":
-            display = "пробел нулевой ширины"
-        elif character.isprintable():
-            display = f"«{character}»"
-        else:
-            display = "непечатный символ"
-        unicode_name = unicodedata.name(character, "UNNAMED CHARACTER")
-        return f"{display} — U+{ord(character):04X} — {unicode_name}"
-
-    def _refresh_exceptions_ui(self) -> None:
-        count = len(self.excluded_characters)
-        self.check_tab.set_exceptions_count(count)
-        listbox = self.exceptions_listbox
-        if listbox is None or not listbox.winfo_exists():
-            return
-
-        self.exception_list_characters = sorted(
-            self.excluded_characters,
-            key=ord,
-        )
-        listbox.delete(0, tk.END)
-        for character in self.exception_list_characters:
-            listbox.insert(tk.END, self._exception_label(character))
-
-    def _save_exceptions(self, previous: set[str]) -> bool:
-        try:
-            self._save_current_settings()
-        except SettingsError as error:
-            self.excluded_characters = previous
-            self._refresh_exceptions_ui()
-            messagebox.showerror("Исключения не сохранены", str(error))
-            return False
-        self._refresh_exceptions_ui()
-        return True
-
-    def _add_excluded_text(self, text: str) -> bool:
-        characters = set(text)
-        new_characters = characters - self.excluded_characters
-        if not new_characters:
-            self.root.bell()
-            return False
-
-        previous = self.excluded_characters.copy()
-        self.excluded_characters.update(new_characters)
-        if not self._save_exceptions(previous):
-            return False
-
-        codes = ", ".join(
-            f"U+{ord(character):04X}" for character in sorted(new_characters, key=ord)
-        )
-        self.check_tab.set_status(
-            f"Добавлено в исключения: {codes}. Будет применено при следующей проверке."
-        )
-        return True
-
-    def _remove_selected_exceptions(self) -> None:
-        listbox = self.exceptions_listbox
-        if listbox is None or not listbox.winfo_exists():
-            return
-        selected_indices = listbox.curselection()
-        if not selected_indices:
-            self.root.bell()
-            return
-
-        removed = {self.exception_list_characters[index] for index in selected_indices}
-        previous = self.excluded_characters.copy()
-        self.excluded_characters.difference_update(removed)
-        if not self._save_exceptions(previous):
-            return
-
-        codes = ", ".join(
-            f"U+{ord(character):04X}" for character in sorted(removed, key=ord)
-        )
-        self.check_tab.set_status(
-            f"Удалено из исключений: {codes}. Будет применено при следующей проверке."
-        )
-
-    def _close_exceptions_dialog(self) -> None:
-        dialog = self.exceptions_dialog
-        self.exceptions_dialog = None
-        self.exceptions_listbox = None
-        self.exception_list_characters = []
-        if dialog is not None and dialog.winfo_exists():
-            dialog.grab_release()
-            dialog.destroy()
-
-    def _open_exceptions_dialog(self) -> None:
-        dialog = self.exceptions_dialog
-        if dialog is not None and dialog.winfo_exists():
-            dialog.lift()
-            dialog.focus_force()
-            return
-
-        dialog = tk.Toplevel(self.root)
-        self.exceptions_dialog = dialog
-        dialog.title("Исключения UNSAFE_GLYPH")
-        dialog.geometry("680x390")
-        dialog.minsize(560, 320)
-        dialog.transient(self.root)
-        dialog.protocol("WM_DELETE_WINDOW", self._close_exceptions_dialog)
-
-        outer = ttk.Frame(dialog, padding=12)
-        outer.pack(fill=tk.BOTH, expand=True)
-        ttk.Label(
-            outer,
-            text=(
-                "Добавленные символы не считаются небезопасными ни в мягком, "
-                "ни в жёстком режиме. Можно вставить сразу несколько символов."
-            ),
-            justify=tk.LEFT,
-            wraplength=640,
-        ).pack(fill=tk.X)
-
-        input_frame = ttk.Frame(outer)
-        input_frame.pack(fill=tk.X, pady=(10, 8))
-        input_var = tk.StringVar()
-        entry = ttk.Entry(input_frame, textvariable=input_var)
-        entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-
-        def add_from_entry(_event: object | None = None) -> str:
-            if self._add_excluded_text(input_var.get()):
-                input_var.set("")
-            return "break"
-
-        ttk.Button(
-            input_frame,
-            text="Добавить символы",
-            command=add_from_entry,
-        ).pack(side=tk.LEFT, padx=(8, 0))
-        entry.bind("<Return>", add_from_entry)
-
-        list_frame = ttk.Frame(outer)
-        list_frame.pack(fill=tk.BOTH, expand=True)
-        self.exceptions_listbox = tk.Listbox(
-            list_frame,
-            selectmode=tk.EXTENDED,
-            exportselection=False,
-        )
-        scrollbar = ttk.Scrollbar(
-            list_frame,
-            orient=tk.VERTICAL,
-            command=self.exceptions_listbox.yview,
-        )
-        self.exceptions_listbox.configure(yscrollcommand=scrollbar.set)
-        self.exceptions_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        buttons = ttk.Frame(outer)
-        buttons.pack(fill=tk.X, pady=(8, 0))
-        ttk.Button(
-            buttons,
-            text="Удалить выбранные",
-            command=self._remove_selected_exceptions,
-        ).pack(side=tk.LEFT)
-        ttk.Button(
-            buttons,
-            text="Закрыть",
-            command=self._close_exceptions_dialog,
-        ).pack(side=tk.RIGHT)
-
-        self._refresh_exceptions_ui()
-        dialog.grab_set()
-        entry.focus_set()
-
-    def _add_selected_character_to_exceptions(self) -> None:
-        character = self.check_tab.selected_character()
-        if not character or character in self.excluded_characters:
-            self.root.bell()
-            return
-        self._add_excluded_text(character)
-
 
 def run_gui(app_root: Path) -> None:
     root = tk.Tk()

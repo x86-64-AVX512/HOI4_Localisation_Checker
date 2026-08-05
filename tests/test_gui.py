@@ -103,6 +103,19 @@ class GuiTests(unittest.TestCase):
         self.assertFalse(settings.check_russian_straight_quotes)
         self.assertEqual(2, saved["format_version"])
 
+    def test_exception_controller_saves_with_application_settings(self) -> None:
+        self.assertTrue(self.app.exceptions.add_text("…«"))
+
+        settings = load_settings(self.app_root / "settings.json")
+        self.assertEqual(
+            frozenset({"…", "«"}),
+            settings.excluded_characters,
+        )
+        self.assertEqual(
+            "Исключения… (2)",
+            self.app.check_tab.exceptions_button["text"],
+        )
+
     def test_layout_options_are_saved_through_extracted_tab(self) -> None:
         self.app.layout_tab.focus_limit_var.set("365")
         self.app.layout_tab.event_limit_var.set("3500")
