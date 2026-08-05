@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import threading
 import tkinter as tk
 import unicodedata
 from dataclasses import replace
@@ -30,23 +29,14 @@ from .font_context import (
     mod_display_name,
 )
 from .font_profile import FontProfile, FontProfileError
-from .gui_check_tab import (
-    GLYPH_DIAGNOSTIC_CODES,
-    LocalisationCheckTab,
-)
+from .gui_check_tab import LocalisationCheckTab
 from .gui_compare_tab import ComparisonTab
+from .gui_editor import NotepadPlusPlusController
 from .gui_layout_tab import TextLayoutTab
 from .localisation_compare import (
     ComparisonLanguage,
     LocalisationComparator,
     LocalisationComparisonResult,
-)
-from .models import Diagnostic
-from .notepad_plus_plus import (
-    NotepadPlusPlusError,
-    OpenResult,
-    find_notepad_plus_plus,
-    open_location,
 )
 from .settings import (
     AppSettings,
@@ -135,6 +125,13 @@ class CheckerApplication:
         self.checker = LocalisationChecker(self.font_profile)
         self.text_layout_checker = TextLayoutChecker()
         self.localisation_comparator = LocalisationComparator()
+        self.editor = NotepadPlusPlusController(
+            root=self.root,
+            tasks=self.tasks,
+            configured_path=lambda: self.notepad_plus_plus_path,
+            remember_executable=self._remember_notepad_plus_plus,
+            fullscreen=lambda: self.notepad_plus_plus_fullscreen,
+        )
         self._build_ui()
         self.root.after(100, self._poll_events)
 
@@ -176,7 +173,7 @@ class CheckerApplication:
             on_unknown_context_changed=self._unknown_context_visibility_changed,
             on_russian_quotes_changed=self._russian_straight_quotes_changed,
             on_notepad_mode_changed=self._notepad_window_mode_changed,
-            on_open_diagnostic=self._open_diagnostic,
+            on_open_diagnostic=self.editor.open_diagnostic,
             on_add_selected_exception=(self._add_selected_character_to_exceptions),
             is_character_excluded=self.excluded_characters.__contains__,
             on_export=self._export_table_results,
@@ -212,7 +209,7 @@ class CheckerApplication:
             on_controls_changed=self._layout_controls_changed,
             on_select_context_mod=self._select_context_mod,
             on_select_preview_cli=self._select_focus_preview_cli,
-            on_open_diagnostic=self._open_diagnostic,
+            on_open_diagnostic=self.editor.open_diagnostic,
             on_export=self._export_table_results,
         )
         self._refresh_layout_controls()
@@ -876,49 +873,8 @@ class CheckerApplication:
     def _handle_task_notice(self, event: TaskNotice) -> None:
         if event.source == "layout" and event.kind == "preview_started":
             self.layout_tab.show_preview_started(cast(int, event.payload))
-        elif event.source == "compare_editor" and event.kind == "opened":
-            self._show_compare_editor_result(
-                cast(
-                    list[
-                        tuple[
-                            ComparisonLanguage,
-                            Diagnostic,
-                            OpenResult,
-                        ]
-                    ],
-                    event.payload,
-                )
-            )
-        elif event.source == "compare_editor" and event.kind == "failure":
-            error, opened = cast(
-                tuple[
-                    Exception,
-                    list[
-                        tuple[
-                            ComparisonLanguage,
-                            Diagnostic,
-                            OpenResult,
-                        ]
-                    ],
-                ],
-                event.payload,
-            )
-            self._show_compare_editor_failure(error, opened)
-        elif event.source == "editor" and event.kind == "opened":
-            diagnostic, result, status_var = cast(
-                tuple[Diagnostic, OpenResult, tk.StringVar],
-                event.payload,
-            )
-            self._show_editor_result(
-                diagnostic,
-                result,
-                status_var,
-            )
-        elif event.source == "editor" and event.kind == "failure":
-            messagebox.showerror(
-                "Не удалось открыть Notepad++",
-                str(event.payload),
-            )
+        else:
+            self.editor.handle_notice(event)
 
     @staticmethod
     def _show_layout_preview_errors(result: TextLayoutResult) -> None:
@@ -937,58 +893,11 @@ class CheckerApplication:
         self,
         languages: tuple[ComparisonLanguage, ...],
     ) -> str:
-        issue = self.compare_tab.selected_issue()
-        diagnostics: list[tuple[ComparisonLanguage, Diagnostic]] = []
-        if issue is not None:
-            for language in languages:
-                diagnostic = issue.diagnostic_for(language)
-                if diagnostic is not None and diagnostic.path.is_file():
-                    diagnostics.append((language, diagnostic))
-        if not diagnostics:
-            self.root.bell()
-            return "break"
-
-        executable = self._resolve_notepad_plus_plus()
-        if executable is None:
-            self.compare_tab.status_var.set("Открытие в Notepad++ отменено.")
-            return "break"
-
-        labels = {
-            "english": "английский",
-            "russian": "русский",
-        }
-        requested = " и ".join(labels[language] for language, _ in diagnostics)
-        self.compare_tab.status_var.set(f"Открывается {requested} файл в Notepad++…")
-        fullscreen = self.notepad_plus_plus_fullscreen
-
-        def work() -> None:
-            opened: list[tuple[ComparisonLanguage, Diagnostic, OpenResult]] = []
-            try:
-                for language, diagnostic in diagnostics:
-                    result = open_location(
-                        executable=executable,
-                        file_path=diagnostic.path,
-                        line=diagnostic.line,
-                        column=diagnostic.column,
-                        selection_length=0,
-                        fullscreen=fullscreen,
-                    )
-                    opened.append((language, diagnostic, result))
-            except NotepadPlusPlusError as error:
-                self.tasks.post_notice(
-                    "compare_editor",
-                    "failure",
-                    (error, opened),
-                )
-                return
-            self.tasks.post_notice(
-                "compare_editor",
-                "opened",
-                opened,
-            )
-
-        threading.Thread(target=work, daemon=True).start()
-        return "break"
+        return self.editor.open_comparison(
+            self.compare_tab.selected_issue(),
+            languages,
+            self.compare_tab.status_var,
+        )
 
     def _save_current_settings(self) -> None:
         save_settings(
@@ -1141,156 +1050,6 @@ class CheckerApplication:
             messagebox.showwarning(
                 "Путь к Notepad++ не сохранён",
                 str(error),
-            )
-
-    def _resolve_notepad_plus_plus(self) -> Path | None:
-        executable = find_notepad_plus_plus(self.notepad_plus_plus_path)
-        if executable is not None:
-            if str(executable) != self.notepad_plus_plus_path:
-                self._remember_notepad_plus_plus(executable)
-            return executable
-
-        selected = filedialog.askopenfilename(
-            parent=self.root,
-            title="Укажите notepad++.exe",
-            filetypes=[
-                ("Notepad++", "notepad++.exe"),
-                ("Исполняемые файлы", "*.exe"),
-                ("Все файлы", "*.*"),
-            ],
-        )
-        if not selected:
-            return None
-
-        executable = Path(selected)
-        if not executable.is_file():
-            messagebox.showerror(
-                "Notepad++ не найден",
-                f"Указанный файл не существует:\n{executable}",
-            )
-            return None
-        self._remember_notepad_plus_plus(executable.resolve())
-        return executable.resolve()
-
-    def _open_diagnostic(
-        self,
-        diagnostic: Diagnostic | None,
-        status_var: tk.StringVar,
-    ) -> str:
-        if diagnostic is None:
-            self.root.bell()
-            return "break"
-        if not diagnostic.path.is_file():
-            messagebox.showerror(
-                "Файл не найден",
-                f"Нельзя открыть файл диагностики:\n{diagnostic.path}",
-            )
-            return "break"
-
-        executable = self._resolve_notepad_plus_plus()
-        if executable is None:
-            status_var.set("Открытие в Notepad++ отменено.")
-            return "break"
-
-        selection_length = diagnostic.selection_length
-        if (
-            selection_length <= 0
-            and diagnostic.code in GLYPH_DIAGNOSTIC_CODES
-            and diagnostic.character
-        ):
-            selection_length = 1
-        fullscreen = self.notepad_plus_plus_fullscreen
-        status_var.set(
-            f"Открывается в Notepad++: "
-            f"{diagnostic.path}:{diagnostic.line}:{diagnostic.column}"
-        )
-
-        def work() -> None:
-            try:
-                result = open_location(
-                    executable=executable,
-                    file_path=diagnostic.path,
-                    line=diagnostic.line,
-                    column=diagnostic.column,
-                    selection_length=selection_length,
-                    fullscreen=fullscreen,
-                )
-            except NotepadPlusPlusError as error:
-                self.tasks.post_notice("editor", "failure", error)
-                return
-            self.tasks.post_notice(
-                "editor",
-                "opened",
-                (diagnostic, result, status_var),
-            )
-
-        threading.Thread(target=work, daemon=True).start()
-        return "break"
-
-    def _show_compare_editor_result(
-        self,
-        opened: list[tuple[ComparisonLanguage, Diagnostic, OpenResult]],
-    ) -> None:
-        labels = {
-            "english": "английский",
-            "russian": "русский",
-        }
-        if not opened:
-            self.compare_tab.status_var.set("Notepad++ не открыл ни одного файла.")
-            return
-        opened_labels = " и ".join(labels[language] for language, _, _ in opened)
-        if len(opened) == 1:
-            _, diagnostic, result = opened[0]
-            location = f"{diagnostic.path}:{diagnostic.line}:{diagnostic.column}"
-            if result.exact_position_set:
-                self.compare_tab.status_var.set(
-                    f"Открыт {opened_labels} файл в Notepad++ на позиции: {location}"
-                )
-            else:
-                self.compare_tab.status_var.set(
-                    f"Открыт {opened_labels} файл в Notepad++: "
-                    f"{location}. Точная позиция не подтверждена."
-                )
-            return
-        active_language, active_diagnostic, _ = opened[-1]
-        self.compare_tab.status_var.set(
-            f"Открыты {opened_labels} файлы в Notepad++; "
-            f"активен {labels[active_language]}: "
-            f"{active_diagnostic.path}:"
-            f"{active_diagnostic.line}:{active_diagnostic.column}"
-        )
-
-    def _show_compare_editor_failure(
-        self,
-        error: Exception,
-        opened: list[tuple[ComparisonLanguage, Diagnostic, OpenResult]],
-    ) -> None:
-        if opened:
-            self.compare_tab.status_var.set(
-                f"Открыто файлов: {len(opened)}; следующий файл открыть не удалось."
-            )
-        else:
-            self.compare_tab.status_var.set("Файлы в Notepad++ открыть не удалось.")
-        messagebox.showerror(
-            "Не удалось открыть файл сравнения в Notepad++",
-            str(error),
-        )
-
-    def _show_editor_result(
-        self,
-        diagnostic: Diagnostic,
-        result: OpenResult,
-        status_var: tk.StringVar,
-    ) -> None:
-        location = f"{diagnostic.path}:{diagnostic.line}:{diagnostic.column}"
-        if result.character_selected:
-            status_var.set(f"Открыто в Notepad++; фрагмент выделен: {location}")
-        elif result.exact_position_set:
-            status_var.set(f"Открыто в Notepad++ на позиции: {location}")
-        else:
-            status_var.set(
-                f"Файл открыт в Notepad++ через строку и столбец: {location}. "
-                "Точное позиционирование через редактор не подтверждено."
             )
 
     @staticmethod

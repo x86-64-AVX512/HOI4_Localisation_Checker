@@ -3,6 +3,10 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+GLYPH_DIAGNOSTIC_CODES = frozenset(
+    {"UNSAFE_GLYPH", "UNKNOWN_FONT_CONTEXT"}
+)
+
 
 @dataclass(frozen=True, slots=True)
 class Diagnostic:

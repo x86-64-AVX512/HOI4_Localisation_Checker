@@ -7,9 +7,7 @@ from tkinter import ttk
 from typing import cast
 
 from .checker import GlyphMode, ScanResult
-from .models import Diagnostic
-
-GLYPH_DIAGNOSTIC_CODES = frozenset({"UNSAFE_GLYPH", "UNKNOWN_FONT_CONTEXT"})
+from .models import GLYPH_DIAGNOSTIC_CODES, Diagnostic
 
 OpenDiagnosticCallback = Callable[[Diagnostic | None, tk.StringVar], str]
 ExportCallback = Callable[[ttk.Treeview, str, tk.StringVar], None]
