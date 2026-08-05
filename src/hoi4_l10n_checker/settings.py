@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+import os
+import tempfile
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Iterable
+
+
+CURRENT_SETTINGS_FORMAT_VERSION = 2
 
 
 class SettingsError(RuntimeError):
@@ -33,19 +38,124 @@ class AppSettings:
     export_directory: str = ""
 
 
+_DEFAULT_SETTINGS = AppSettings()
+_BOOLEAN_FIELDS = (
+    "notepad_plus_plus_fullscreen",
+    "show_unknown_context_warnings",
+    "check_russian_straight_quotes",
+    "layout_focus_enabled",
+    "layout_events_enabled",
+    "layout_welcome_enabled",
+)
+_STRING_FIELDS = (
+    "notepad_plus_plus_path",
+    "context_mod_path",
+    "hoi4_install_path",
+    "layout_focus_preview_cli_path",
+    "compare_english_path",
+    "compare_russian_path",
+    "export_directory",
+)
+_POSITIVE_INTEGER_FIELDS = (
+    "layout_focus_limit",
+    "layout_event_limit",
+    "layout_welcome_limit",
+)
+_CHOICE_FIELDS = {
+    "layout_focus_mode": frozenset({"length", "newline", "exact"}),
+    "layout_focus_preview_priority": frozenset(
+        {"auto_ru", "auto_en", "ru", "en"}
+    ),
+}
+
+
 def settings_path_for(app_root: Path) -> Path:
     return app_root / "settings.json"
 
 
-def load_settings(path: Path) -> AppSettings:
-    if not path.is_file():
-        return AppSettings()
+def _migrate_settings_data(raw_data: object) -> dict[str, object]:
+    if not isinstance(raw_data, dict):
+        raise SettingsError(
+            "Корневое значение settings.json должно быть объектом JSON."
+        )
 
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise SettingsError(f"Не удалось прочитать настройки: {error}") from error
+    data = dict(raw_data)
+    raw_version = data.get("format_version", 1)
+    if isinstance(raw_version, bool) or not isinstance(raw_version, int):
+        raise SettingsError(
+            "Значение format_version должно быть целым числом."
+        )
+    if raw_version < 1:
+        raise SettingsError(
+            f"Некорректная версия формата настроек: {raw_version}."
+        )
+    if raw_version > CURRENT_SETTINGS_FORMAT_VERSION:
+        raise SettingsError(
+            "Формат settings.json новее поддерживаемого: "
+            f"{raw_version} > {CURRENT_SETTINGS_FORMAT_VERSION}. "
+            "Используйте более новую версию программы."
+        )
 
+    version = raw_version
+    while version < CURRENT_SETTINGS_FORMAT_VERSION:
+        if version == 1:
+            data.pop("layout_focus_preview_policy", None)
+            version = 2
+            continue
+        raise SettingsError(
+            f"Неизвестен способ обновления формата настроек {version}."
+        )
+
+    data["format_version"] = CURRENT_SETTINGS_FORMAT_VERSION
+    return data
+
+
+def _read_boolean(data: dict[str, object], name: str) -> bool:
+    default = getattr(_DEFAULT_SETTINGS, name)
+    value = data.get(name, default)
+    if not isinstance(value, bool):
+        raise SettingsError(
+            f"Значение {name} в настройках не является логическим."
+        )
+    return value
+
+
+def _read_string(data: dict[str, object], name: str) -> str:
+    default = getattr(_DEFAULT_SETTINGS, name)
+    value = data.get(name, default)
+    if not isinstance(value, str):
+        raise SettingsError(
+            f"Значение {name} в настройках не является текстом."
+        )
+    return value
+
+
+def _read_positive_integer(data: dict[str, object], name: str) -> int:
+    default = getattr(_DEFAULT_SETTINGS, name)
+    value = data.get(name, default)
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise SettingsError(
+            f"Значение {name} должно быть положительным целым числом."
+        )
+    return value
+
+
+def _read_choice(
+    data: dict[str, object],
+    name: str,
+    allowed: frozenset[str],
+) -> str:
+    default = getattr(_DEFAULT_SETTINGS, name)
+    value = data.get(name, default)
+    if not isinstance(value, str) or value not in allowed:
+        expected = ", ".join(sorted(allowed))
+        raise SettingsError(
+            f"Значение {name} должно быть одним из: {expected}."
+        )
+    return value
+
+
+def _settings_from_data(data: dict[str, object]) -> AppSettings:
     raw_characters = data.get("excluded_characters")
     if not isinstance(raw_characters, list):
         raise SettingsError(
@@ -56,145 +166,48 @@ def load_settings(path: Path) -> AppSettings:
     for value in raw_characters:
         if not isinstance(value, str):
             raise SettingsError(
-                "Список excluded_characters содержит значение, которое не является текстом."
+                "Список excluded_characters содержит значение, "
+                "которое не является текстом."
             )
         characters.update(value)
-    raw_editor_path = data.get("notepad_plus_plus_path", "")
-    if not isinstance(raw_editor_path, str):
-        raise SettingsError(
-            "Значение notepad_plus_plus_path в настройках не является текстом."
-        )
-    raw_editor_fullscreen = data.get("notepad_plus_plus_fullscreen", False)
-    if not isinstance(raw_editor_fullscreen, bool):
-        raise SettingsError(
-            "Значение notepad_plus_plus_fullscreen в настройках "
-            "не является логическим."
-        )
-    raw_context_mod_path = data.get("context_mod_path", "")
-    if not isinstance(raw_context_mod_path, str):
-        raise SettingsError(
-            "Значение context_mod_path в настройках не является текстом."
-        )
-    raw_hoi4_install_path = data.get("hoi4_install_path", "")
-    if not isinstance(raw_hoi4_install_path, str):
-        raise SettingsError(
-            "Значение hoi4_install_path в настройках не является текстом."
-        )
-    raw_show_unknown_context = data.get(
-        "show_unknown_context_warnings",
-        False,
-    )
-    if not isinstance(raw_show_unknown_context, bool):
-        raise SettingsError(
-            "Значение show_unknown_context_warnings в настройках "
-            "не является логическим."
-        )
-    raw_check_russian_straight_quotes = data.get(
-        "check_russian_straight_quotes",
-        True,
-    )
-    raw_layout_focus_enabled = data.get("layout_focus_enabled", True)
-    raw_layout_focus_mode = data.get("layout_focus_mode", "length")
-    raw_layout_focus_limit = data.get("layout_focus_limit", 350)
-    raw_layout_focus_preview_cli_path = data.get(
-        "layout_focus_preview_cli_path",
-        "",
-    )
-    raw_layout_focus_preview_priority = data.get(
-        "layout_focus_preview_priority",
-        "auto_ru",
-    )
-    raw_layout_events_enabled = data.get("layout_events_enabled", True)
-    raw_layout_event_limit = data.get("layout_event_limit", 3400)
-    raw_layout_welcome_enabled = data.get("layout_welcome_enabled", True)
-    raw_layout_welcome_limit = data.get("layout_welcome_limit", 3400)
-    raw_compare_english_path = data.get("compare_english_path", "")
-    raw_compare_russian_path = data.get("compare_russian_path", "")
-    raw_export_directory = data.get("export_directory", "")
 
-    for name, value in (
-        (
-            "check_russian_straight_quotes",
-            raw_check_russian_straight_quotes,
-        ),
-        ("layout_focus_enabled", raw_layout_focus_enabled),
-        ("layout_events_enabled", raw_layout_events_enabled),
-        ("layout_welcome_enabled", raw_layout_welcome_enabled),
-    ):
-        if not isinstance(value, bool):
-            raise SettingsError(
-                f"Значение {name} в настройках не является логическим."
-            )
-    for name, value in (
-        ("compare_english_path", raw_compare_english_path),
-        ("compare_russian_path", raw_compare_russian_path),
-        ("export_directory", raw_export_directory),
-    ):
-        if not isinstance(value, str):
-            raise SettingsError(
-                f"Значение {name} в настройках не является текстом."
-            )
-    if (
-        not isinstance(raw_layout_focus_mode, str)
-        or raw_layout_focus_mode not in {"length", "newline", "exact"}
-    ):
-        raise SettingsError(
-            "Значение layout_focus_mode должно быть length, newline "
-            "или exact."
-        )
-    if not isinstance(raw_layout_focus_preview_cli_path, str):
-        raise SettingsError(
-            "Значение layout_focus_preview_cli_path не является текстом."
-        )
-    if (
-        not isinstance(raw_layout_focus_preview_priority, str)
-        or raw_layout_focus_preview_priority
-        not in {"auto_ru", "auto_en", "ru", "en"}
-    ):
-        raise SettingsError(
-            "Некорректное значение layout_focus_preview_priority."
-        )
-    for name, value in (
-        ("layout_focus_limit", raw_layout_focus_limit),
-        ("layout_event_limit", raw_layout_event_limit),
-        ("layout_welcome_limit", raw_layout_welcome_limit),
-    ):
-        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-            raise SettingsError(
-                f"Значение {name} должно быть положительным целым числом."
-            )
+    values: dict[str, object] = {}
+    for name in _BOOLEAN_FIELDS:
+        values[name] = _read_boolean(data, name)
+    for name in _STRING_FIELDS:
+        values[name] = _read_string(data, name)
+    for name in _POSITIVE_INTEGER_FIELDS:
+        values[name] = _read_positive_integer(data, name)
+    for name, allowed in _CHOICE_FIELDS.items():
+        values[name] = _read_choice(data, name, allowed)
+
     return AppSettings(
         excluded_characters=frozenset(characters),
-        notepad_plus_plus_path=raw_editor_path,
-        notepad_plus_plus_fullscreen=raw_editor_fullscreen,
-        context_mod_path=raw_context_mod_path,
-        hoi4_install_path=raw_hoi4_install_path,
-        show_unknown_context_warnings=raw_show_unknown_context,
-        check_russian_straight_quotes=(
-            raw_check_russian_straight_quotes
-        ),
-        layout_focus_enabled=raw_layout_focus_enabled,
-        layout_focus_mode=raw_layout_focus_mode,
-        layout_focus_limit=raw_layout_focus_limit,
-        layout_focus_preview_cli_path=(
-            raw_layout_focus_preview_cli_path
-        ),
-        layout_focus_preview_priority=raw_layout_focus_preview_priority,
-        layout_events_enabled=raw_layout_events_enabled,
-        layout_event_limit=raw_layout_event_limit,
-        layout_welcome_enabled=raw_layout_welcome_enabled,
-        layout_welcome_limit=raw_layout_welcome_limit,
-        compare_english_path=raw_compare_english_path,
-        compare_russian_path=raw_compare_russian_path,
-        export_directory=raw_export_directory,
+        **values,
     )
 
 
-def save_settings(
-    path: Path,
-    settings: AppSettings,
-) -> None:
-    normalized = sorted(
+def load_settings(path: Path) -> AppSettings:
+    if not path.is_file():
+        return AppSettings()
+
+    try:
+        raw_data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise SettingsError(
+            f"Не удалось прочитать настройки: {error}"
+        ) from error
+
+    data = _migrate_settings_data(raw_data)
+    return _settings_from_data(data)
+
+
+def _settings_data(settings: AppSettings) -> dict[str, object]:
+    data: dict[str, object] = {
+        "format_version": CURRENT_SETTINGS_FORMAT_VERSION,
+        **asdict(settings),
+    }
+    data["excluded_characters"] = sorted(
         {
             character
             for value in settings.excluded_characters
@@ -202,45 +215,61 @@ def save_settings(
         },
         key=ord,
     )
-    data = {
-        "format_version": 1,
-        "excluded_characters": normalized,
-        "notepad_plus_plus_path": settings.notepad_plus_plus_path,
-        "notepad_plus_plus_fullscreen": settings.notepad_plus_plus_fullscreen,
-        "context_mod_path": settings.context_mod_path,
-        "hoi4_install_path": settings.hoi4_install_path,
-        "show_unknown_context_warnings": (
-            settings.show_unknown_context_warnings
-        ),
-        "check_russian_straight_quotes": (
-            settings.check_russian_straight_quotes
-        ),
-        "layout_focus_enabled": settings.layout_focus_enabled,
-        "layout_focus_mode": settings.layout_focus_mode,
-        "layout_focus_limit": settings.layout_focus_limit,
-        "layout_focus_preview_cli_path": (
-            settings.layout_focus_preview_cli_path
-        ),
-        "layout_focus_preview_priority": (
-            settings.layout_focus_preview_priority
-        ),
-        "layout_events_enabled": settings.layout_events_enabled,
-        "layout_event_limit": settings.layout_event_limit,
-        "layout_welcome_enabled": settings.layout_welcome_enabled,
-        "layout_welcome_limit": settings.layout_welcome_limit,
-        "compare_english_path": settings.compare_english_path,
-        "compare_russian_path": settings.compare_russian_path,
-        "export_directory": settings.export_directory,
-    }
+    return data
 
+
+def _atomic_write_text(path: Path, text: str) -> None:
+    temporary_path: Path | None = None
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+        with tempfile.NamedTemporaryFile(
+            mode="w",
             encoding="utf-8",
+            newline="\n",
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            dir=path.parent,
+            delete=False,
+        ) as output:
+            temporary_path = Path(output.name)
+            output.write(text)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary_path, path)
+        temporary_path = None
+    finally:
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
+def save_settings(
+    path: Path,
+    settings: AppSettings,
+) -> None:
+    if path.exists():
+        if not path.is_file():
+            raise SettingsError(
+                f"Путь настроек не является файлом: {path}"
+            )
+        load_settings(path)
+
+    text = (
+        json.dumps(
+            _settings_data(settings),
+            ensure_ascii=False,
+            indent=2,
         )
+        + "\n"
+    )
+    try:
+        _atomic_write_text(path, text)
     except OSError as error:
-        raise SettingsError(f"Не удалось сохранить настройки: {error}") from error
+        raise SettingsError(
+            f"Не удалось сохранить настройки: {error}"
+        ) from error
 
 
 def load_excluded_characters(path: Path) -> frozenset[str]:
@@ -251,33 +280,8 @@ def save_excluded_characters(path: Path, characters: Iterable[str]) -> None:
     existing = load_settings(path)
     save_settings(
         path,
-        AppSettings(
+        replace(
+            existing,
             excluded_characters=frozenset(characters),
-            notepad_plus_plus_path=existing.notepad_plus_plus_path,
-            notepad_plus_plus_fullscreen=existing.notepad_plus_plus_fullscreen,
-            context_mod_path=existing.context_mod_path,
-            hoi4_install_path=existing.hoi4_install_path,
-            show_unknown_context_warnings=(
-                existing.show_unknown_context_warnings
-            ),
-            check_russian_straight_quotes=(
-                existing.check_russian_straight_quotes
-            ),
-            layout_focus_enabled=existing.layout_focus_enabled,
-            layout_focus_mode=existing.layout_focus_mode,
-            layout_focus_limit=existing.layout_focus_limit,
-            layout_focus_preview_cli_path=(
-                existing.layout_focus_preview_cli_path
-            ),
-            layout_focus_preview_priority=(
-                existing.layout_focus_preview_priority
-            ),
-            layout_events_enabled=existing.layout_events_enabled,
-            layout_event_limit=existing.layout_event_limit,
-            layout_welcome_enabled=existing.layout_welcome_enabled,
-            layout_welcome_limit=existing.layout_welcome_limit,
-            compare_english_path=existing.compare_english_path,
-            compare_russian_path=existing.compare_russian_path,
-            export_directory=existing.export_directory,
         ),
     )

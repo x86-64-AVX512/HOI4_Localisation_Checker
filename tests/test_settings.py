@@ -4,9 +4,12 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from hoi4_l10n_checker.settings import (
     AppSettings,
+    CURRENT_SETTINGS_FORMAT_VERSION,
+    SettingsError,
     load_excluded_characters,
     load_settings,
     save_excluded_characters,
@@ -177,6 +180,111 @@ class SettingsTests(unittest.TestCase):
 
             saved = json.loads(path.read_text(encoding="utf-8"))
             self.assertNotIn("layout_focus_preview_policy", saved)
+            self.assertEqual(
+                CURRENT_SETTINGS_FORMAT_VERSION,
+                saved["format_version"],
+            )
+
+    def test_settings_without_version_are_migrated_from_version_one(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "settings.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "excluded_characters": ["…"],
+                        "notepad_plus_plus_fullscreen": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            settings = load_settings(path)
+            save_settings(path, settings)
+            saved = json.loads(path.read_text(encoding="utf-8"))
+
+            self.assertEqual(frozenset({"…"}), settings.excluded_characters)
+            self.assertTrue(settings.notepad_plus_plus_fullscreen)
+            self.assertEqual(
+                CURRENT_SETTINGS_FORMAT_VERSION,
+                saved["format_version"],
+            )
+
+    def test_newer_settings_format_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "settings.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "format_version": (
+                            CURRENT_SETTINGS_FORMAT_VERSION + 1
+                        ),
+                        "excluded_characters": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            original = path.read_bytes()
+
+            with self.assertRaisesRegex(
+                SettingsError,
+                "новее поддерживаемого",
+            ):
+                load_settings(path)
+            with self.assertRaisesRegex(
+                SettingsError,
+                "новее поддерживаемого",
+            ):
+                save_settings(path, AppSettings())
+            self.assertEqual(original, path.read_bytes())
+
+    def test_invalid_settings_root_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "settings.json"
+            path.write_text("[]\n", encoding="utf-8")
+            original = path.read_bytes()
+
+            with self.assertRaisesRegex(
+                SettingsError,
+                "должно быть объектом JSON",
+            ):
+                load_settings(path)
+            with self.assertRaisesRegex(
+                SettingsError,
+                "должно быть объектом JSON",
+            ):
+                save_settings(path, AppSettings())
+            self.assertEqual(original, path.read_bytes())
+
+    def test_failed_atomic_replace_preserves_existing_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / "settings.json"
+            save_settings(
+                path,
+                AppSettings(export_directory=r"C:\Old exports"),
+            )
+            original = path.read_bytes()
+
+            with patch(
+                "hoi4_l10n_checker.settings.os.replace",
+                side_effect=OSError("simulated replace failure"),
+            ):
+                with self.assertRaisesRegex(
+                    SettingsError,
+                    "simulated replace failure",
+                ):
+                    save_settings(
+                        path,
+                        AppSettings(export_directory=r"D:\New exports"),
+                    )
+
+            self.assertEqual(original, path.read_bytes())
+            self.assertEqual(
+                [],
+                list(root.glob(".settings.json.*.tmp")),
+            )
 
 
 if __name__ == "__main__":

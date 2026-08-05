@@ -78,7 +78,7 @@ if (Test-Path -LiteralPath $fontTarget) {
 Copy-Item -LiteralPath (Join-Path $projectRoot "fonts") -Destination $fontTarget -Recurse
 Copy-Item -LiteralPath (Join-Path $projectRoot "font_profile.json") -Destination $distRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "settings.example.json") `
-    -Destination (Join-Path $distRoot "settings.json")
+    -Destination (Join-Path $distRoot "settings.example.json")
 Copy-Item -LiteralPath (Join-Path $projectRoot "README.txt") -Destination $distRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "LICENSE") -Destination $distRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "CHANGELOG.md") -Destination $distRoot

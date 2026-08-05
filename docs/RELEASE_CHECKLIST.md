@@ -25,11 +25,13 @@ python tools/prepare_font_resources.py --check-only
 - [ ] В заголовке и свойствах EXE указана правильная версия.
 - [ ] В архиве присутствуют `README.txt`, `LICENSE` и
       `THIRD_PARTY_NOTICES.md`.
+- [ ] В архиве есть `settings.example.json`, но нет пользовательского
+      `settings.json`.
 - [ ] В архиве отсутствуют личные абсолютные пути.
 
 ## GitHub Release
 
-- [ ] Создан тег вида `v0.9.6F4-beta`.
+- [ ] Создан тег вида `v0.9.6F5-beta`.
 - [ ] Релиз отмечен как Pre-release.
 - [ ] Приложен только полный `LocalisationChecker-Windows.zip`, а не один
       EXE без `_internal` и ресурсов.
