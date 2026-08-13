@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Literal, Protocol
 
@@ -101,6 +101,11 @@ class TextLayoutResult:
     events_checked: int
     welcome_checked: int
     diagnostics: list[Diagnostic]
+    english_root: Path | None = None
+    english_files_checked: int = 0
+    english_entries_checked: int = 0
+    english_locations: dict[str, Diagnostic] = field(default_factory=dict)
+    english_fallback_paths: dict[Path, Path] = field(default_factory=dict)
     context_gui_files: int = 0
     context_script_files: int = 0
     preview_checked: int = 0
@@ -136,6 +141,42 @@ class TextLayoutResult:
             for item in self.diagnostics
         )
 
+    def issue_for(self, diagnostic: Diagnostic) -> TextLayoutIssue:
+        english = self.english_locations.get(diagnostic.key)
+        if english is None:
+            fallback_path = self.english_fallback_paths.get(
+                diagnostic.path.resolve()
+            )
+            if fallback_path is not None:
+                english = Diagnostic(
+                    severity="warning",
+                    code="TEXT_LAYOUT_REFERENCE_FALLBACK",
+                    path=fallback_path,
+                    line=diagnostic.line,
+                    column=diagnostic.column,
+                    message=(
+                        "Английская пара ключа не найдена; открыта "
+                        "соответствующая строка парного файла."
+                    ),
+                    key=diagnostic.key,
+                )
+        return TextLayoutIssue(
+            russian=diagnostic,
+            english=english,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class TextLayoutIssue:
+    russian: Diagnostic
+    english: Diagnostic | None = None
+
+    def diagnostic_for(
+        self,
+        language: Literal["english", "russian"],
+    ) -> Diagnostic | None:
+        return self.english if language == "english" else self.russian
+
 
 @dataclass(frozen=True, slots=True)
 class _ExactFocusCandidate:
@@ -166,6 +207,54 @@ def _collect_files(target: Path) -> list[Path]:
             key=lambda path: str(path).casefold(),
         )
     return []
+
+
+def _neutral_localisation_name(path: Path) -> str:
+    return (
+        path.name.casefold()
+        .replace("_l_russian", "_l_language")
+        .replace("_l_english", "_l_language")
+    )
+
+
+def _pair_reference_files(
+    target: Path,
+    files: list[Path],
+    english_target: Path | None,
+    english_files: list[Path],
+) -> dict[Path, Path]:
+    if english_target is None or not files or not english_files:
+        return {}
+    if target.is_file() and english_target.is_file():
+        return {target.resolve(): english_target.resolve()}
+
+    english_by_relative: dict[str, Path] = {}
+    english_by_name: dict[str, list[Path]] = defaultdict(list)
+    for path in english_files:
+        relative = path.relative_to(english_target)
+        neutral_relative = relative.with_name(
+            _neutral_localisation_name(relative)
+        ).as_posix().casefold()
+        english_by_relative[neutral_relative] = path
+        english_by_name[_neutral_localisation_name(path)].append(path)
+
+    paired: dict[Path, Path] = {}
+    for path in files:
+        relative = path.relative_to(target)
+        neutral_relative = relative.with_name(
+            _neutral_localisation_name(relative)
+        ).as_posix().casefold()
+        reference = english_by_relative.get(neutral_relative)
+        if reference is None:
+            matches = english_by_name.get(
+                _neutral_localisation_name(path),
+                [],
+            )
+            if len(matches) == 1:
+                reference = matches[0]
+        if reference is not None:
+            paired[path.resolve()] = reference.resolve()
+    return paired
 
 
 def _visible_length(entry: LocalisationEntry) -> int:
@@ -344,6 +433,7 @@ class TextLayoutChecker:
         target: Path,
         mod_root: Path,
         options: TextLayoutOptions,
+        english_target: Path | None = None,
         game_root: Path | None = None,
         progress: ProgressCallback | None = None,
         preview_started: PreviewStartCallback | None = None,
@@ -351,12 +441,51 @@ class TextLayoutChecker:
         options.validate()
         target = target.resolve()
         files = _collect_files(target)
+        english_root = (
+            english_target.resolve()
+            if english_target is not None
+            else None
+        )
+        english_files = (
+            _collect_files(english_root)
+            if english_root is not None
+            else []
+        )
         entries: list[LocalisationEntry] = []
+        english_entries: list[LocalisationEntry] = []
+        total_files = len(files) + len(english_files)
 
         for index, path in enumerate(files, start=1):
             if progress is not None:
-                progress(index, len(files), path)
+                progress(index, total_files, path)
             entries.extend(parse_localisation_file(path).entries)
+        for offset, path in enumerate(english_files, start=1):
+            if progress is not None:
+                progress(len(files) + offset, total_files, path)
+            english_entries.extend(parse_localisation_file(path).entries)
+
+        english_locations: dict[str, Diagnostic] = {}
+        for entry in english_entries:
+            if entry.language.casefold() != "l_english":
+                continue
+            english_locations.setdefault(
+                entry.key,
+                Diagnostic(
+                    severity="warning",
+                    code="TEXT_LAYOUT_REFERENCE",
+                    path=entry.path,
+                    line=entry.line,
+                    column=entry.value_column,
+                    message="Английская запись для сопоставления.",
+                    key=entry.key,
+                ),
+            )
+        english_fallback_paths = _pair_reference_files(
+            target,
+            files,
+            english_root,
+            english_files,
+        )
 
         localisation_values: dict[str, list[str]] = defaultdict(list)
         for entry in entries:
@@ -531,6 +660,11 @@ class TextLayoutChecker:
             events_checked=events_checked,
             welcome_checked=welcome_checked,
             diagnostics=diagnostics,
+            english_root=english_root,
+            english_files_checked=len(english_files),
+            english_entries_checked=len(english_entries),
+            english_locations=english_locations,
+            english_fallback_paths=english_fallback_paths,
             context_gui_files=context.gui_files_checked,
             context_script_files=context.script_files_checked,
             preview_checked=preview_checked,

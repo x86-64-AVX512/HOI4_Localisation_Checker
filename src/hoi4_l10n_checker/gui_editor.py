@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from tkinter import filedialog, messagebox
+from typing import Protocol
 
 from .background_tasks import BackgroundTaskRunner, TaskNotice
 from .localisation_compare import (
@@ -28,6 +29,13 @@ _LANGUAGE_LABELS: dict[ComparisonLanguage, str] = {
     "english": "английский",
     "russian": "русский",
 }
+
+
+class LanguageDiagnosticSource(Protocol):
+    def diagnostic_for(
+        self,
+        language: ComparisonLanguage,
+    ) -> Diagnostic | None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,7 +160,7 @@ class NotepadPlusPlusController:
 
     def open_comparison(
         self,
-        issue: ComparisonIssue | None,
+        issue: ComparisonIssue | LanguageDiagnosticSource | None,
         languages: tuple[ComparisonLanguage, ...],
         status_var: tk.StringVar,
     ) -> str:

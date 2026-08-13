@@ -178,14 +178,15 @@ class CheckerApplication:
             root=self.root,
             notebook=self.notebook,
             options=options,
-            on_choose_file=self._choose_layout_file,
-            on_choose_folder=self._choose_layout_folder,
+            on_run=self._start_layout_scan,
+            on_select_source=self._select_layout_source,
             on_controls_changed=self._layout_controls_changed,
             on_select_context_mod=self._select_context_mod,
             on_select_preview_cli=self._select_focus_preview_cli,
-            on_open_diagnostic=self.editor.open_diagnostic,
+            on_open_languages=self._open_layout_selected_languages,
             on_export=self._export_table_results,
         )
+        self._refresh_layout_source_ui()
         self._refresh_layout_controls()
         self._refresh_context_mod_ui()
         self._refresh_focus_preview_ui()
@@ -218,36 +219,86 @@ class CheckerApplication:
         if selected:
             self._start_scan(Path(selected))
 
-    def _choose_layout_file(self) -> None:
-        selected = filedialog.askopenfilename(
-            title="Выберите файл локализации",
-            filetypes=[
-                ("HOI4 localisation", "*.yml"),
-                ("Все файлы", "*.*"),
-            ],
+    def _refresh_layout_source_ui(self) -> None:
+        if not hasattr(self, "layout_tab"):
+            return
+        settings = self.settings.current
+        self.layout_tab.set_source_paths(
+            settings.layout_english_path,
+            settings.layout_russian_path,
         )
-        if selected:
-            self._start_layout_scan(Path(selected))
 
-    def _choose_layout_folder(self) -> None:
-        selected = filedialog.askdirectory(title="Выберите папку с локализациями")
-        if selected:
-            self._start_layout_scan(Path(selected))
+    def _select_layout_source(
+        self,
+        language: ComparisonLanguage,
+        source_kind: str,
+    ) -> Path | None:
+        if source_kind not in {"file", "folder"}:
+            raise ValueError("Неизвестный тип источника локализации.")
+        attribute = (
+            "layout_english_path"
+            if language == "english"
+            else "layout_russian_path"
+        )
+        current_value = getattr(self.settings.current, attribute)
+        current = Path(current_value) if current_value else None
+        language_label = "английской" if language == "english" else "русской"
+        if source_kind == "file":
+            options: dict[str, object] = {
+                "parent": self.root,
+                "title": f"Выберите файл {language_label} локализации",
+                "filetypes": [
+                    ("HOI4 localisation", "*.yml"),
+                    ("Все файлы", "*.*"),
+                ],
+            }
+            if current is not None:
+                initial = current.parent if current.is_file() else current
+                if initial.is_dir():
+                    options["initialdir"] = str(initial)
+            selected = filedialog.askopenfilename(**options)
+        else:
+            options = {
+                "parent": self.root,
+                "title": f"Выберите папку {language_label} локализации",
+                "mustexist": True,
+            }
+            if current is not None:
+                initial = current if current.is_dir() else current.parent
+                if initial.is_dir():
+                    options["initialdir"] = str(initial)
+            selected = filedialog.askdirectory(**options)
+        if not selected:
+            return None
+
+        path = Path(selected).resolve()
+        try:
+            self.settings.update(**{attribute: str(path)})
+        except SettingsError as error:
+            messagebox.showerror(
+                "Источник локализации не сохранён",
+                str(error),
+            )
+            return None
+        self._refresh_layout_source_ui()
+        self.layout_tab.set_status(f"Выбран {language_label} источник: {path}")
+        return path
 
     def _refresh_focus_preview_ui(self) -> None:
         cli_path = self.settings.current.layout_focus_preview_cli_path
         if not cli_path:
             self.layout_tab.set_preview_cli_status(
-                "не выбран — точная проверка заблокирована"
+                "не выбран — точная проверка заблокирована",
+                False,
             )
             return
         path = Path(cli_path)
         try:
             resolved = validate_focus_preview_installation(path)
         except FocusPreviewError as error:
-            self.layout_tab.set_preview_cli_status(str(error))
+            self.layout_tab.set_preview_cli_status(str(error), False)
             return
-        self.layout_tab.set_preview_cli_status(str(resolved))
+        self.layout_tab.set_preview_cli_status(str(resolved), True)
 
     def _select_focus_preview_cli(self) -> Path | None:
         cli_path = self.settings.current.layout_focus_preview_cli_path
@@ -316,7 +367,10 @@ class CheckerApplication:
                     "находиться папка _internal."
                 ),
             )
-        return self._select_focus_preview_cli()
+        selected = self._select_focus_preview_cli()
+        if selected is None:
+            self.layout_tab.flash_preview_requirement()
+        return selected
 
     def _refresh_compare_paths_ui(self) -> None:
         if hasattr(self, "compare_tab"):
@@ -378,6 +432,7 @@ class CheckerApplication:
             )
             english = self._select_compare_folder("english")
             if english is None:
+                self.compare_tab.flash_path_requirement("english")
                 return None
 
         russian_path = self.settings.current.compare_russian_path
@@ -389,6 +444,7 @@ class CheckerApplication:
             )
             russian = self._select_compare_folder("russian")
             if russian is None:
+                self.compare_tab.flash_path_requirement("russian")
                 return None
         return english.resolve(), russian.resolve()
 
@@ -467,24 +523,26 @@ class CheckerApplication:
         context_mod_path = self.settings.current.context_mod_path
         if not context_mod_path:
             self.check_tab.set_context_status(
-                "не указана — контекстный режим заблокирован"
+                "не указана — контекстный режим заблокирован",
+                False,
             )
             if hasattr(self, "layout_tab"):
                 self.layout_tab.set_context_status(
-                    "не указана — проверка текстов заблокирована"
+                    "не указана — проверка текстов заблокирована",
+                    False,
                 )
             return
         path = Path(context_mod_path)
         if not path.is_dir() or not is_context_root(path):
             message = f"путь недоступен или не является папкой мода: {path}"
-            self.check_tab.set_context_status(message)
+            self.check_tab.set_context_status(message, False)
             if hasattr(self, "layout_tab"):
-                self.layout_tab.set_context_status(message)
+                self.layout_tab.set_context_status(message, False)
             return
         message = f"{mod_display_name(path)} — {path}"
-        self.check_tab.set_context_status(message)
+        self.check_tab.set_context_status(message, True)
         if hasattr(self, "layout_tab"):
-            self.layout_tab.set_context_status(message)
+            self.layout_tab.set_context_status(message, True)
 
     def _select_context_mod(
         self,
@@ -556,6 +614,10 @@ class CheckerApplication:
                 )
                 configured = self._select_context_mod()
                 if configured is None:
+                    if purpose == "Проверку текстов":
+                        self.layout_tab.flash_context_requirement()
+                    else:
+                        self.check_tab.flash_context_requirement()
                     return None
 
             configured = configured.resolve()
@@ -575,6 +637,10 @@ class CheckerApplication:
                 )
                 selected = self._select_context_mod(initial_dir=detected)
                 if selected is None:
+                    if purpose == "Проверку текстов":
+                        self.layout_tab.flash_context_requirement()
+                    else:
+                        self.check_tab.flash_context_requirement()
                     return None
                 continue
             return configured
@@ -681,9 +747,63 @@ class CheckerApplication:
         if self.tasks.start("localisation", work):
             self._set_busy(True)
 
-    def _start_layout_scan(self, target: Path) -> None:
+    def _require_layout_sources(self) -> tuple[Path, Path] | None:
+        settings = self.settings.current
+        raw_paths = {
+            "russian": settings.layout_russian_path,
+            "english": settings.layout_english_path,
+        }
+        resolved: dict[ComparisonLanguage, Path] = {}
+        missing: list[ComparisonLanguage] = []
+        for language in ("russian", "english"):
+            raw_path = raw_paths[language]
+            path = Path(raw_path) if raw_path else None
+            if path is None or not (
+                path.is_dir()
+                or (
+                    path.is_file()
+                    and path.suffix.casefold() == ".yml"
+                )
+            ):
+                missing.append(language)
+                continue
+            resolved[language] = path.resolve()
+        if missing:
+            labels = {
+                "russian": "русский",
+                "english": "английский",
+            }
+            required = " и ".join(labels[item] for item in missing)
+            messagebox.showwarning(
+                "Не выбраны источники локализации",
+                f"Укажите {required} источник перед запуском проверки.",
+            )
+            for language in missing:
+                self.layout_tab.flash_source_requirement(language)
+            return None
+
+        russian = resolved["russian"]
+        english = resolved["english"]
+        if russian.is_file() != english.is_file():
+            messagebox.showwarning(
+                "Источники разного типа",
+                "Выберите либо два .yml-файла, либо две папки.",
+            )
+            self.layout_tab.show_source_type_mismatch()
+            return None
+        return russian, english
+
+    def _start_layout_scan(self) -> None:
         if self.tasks.is_running:
             return
+
+        sources = self._require_layout_sources()
+        if sources is None:
+            self.layout_tab.set_status(
+                "Проверка заблокирована: нужны русский и английский источники."
+            )
+            return
+        russian_target, english_target = sources
 
         try:
             options = self._capture_layout_settings()
@@ -711,7 +831,7 @@ class CheckerApplication:
             return
 
         context_mod_root = self._require_context_mod(
-            target,
+            russian_target,
             purpose="Проверку текстов",
         )
         if context_mod_root is None:
@@ -725,13 +845,15 @@ class CheckerApplication:
             else "; стандартная HOI4 не найдена"
         )
         self.layout_tab.prepare_scan(
-            target,
+            russian_target,
+            english_target,
             f"Контекст: {context_mod_root}{game_note}",
         )
 
         def work(reporter: TaskReporter) -> TextLayoutResult:
             return self.text_layout_checker.scan(
-                target=target,
+                target=russian_target,
+                english_target=english_target,
                 mod_root=context_mod_root,
                 options=options,
                 game_root=context_game_root,
@@ -842,6 +964,16 @@ class CheckerApplication:
             self.compare_tab.selected_issue(),
             languages,
             self.compare_tab.status_var,
+        )
+
+    def _open_layout_selected_languages(
+        self,
+        languages: tuple[ComparisonLanguage, ...],
+    ) -> str:
+        return self.editor.open_comparison(
+            self.layout_tab.selected_issue(),
+            languages,
+            self.layout_tab.current_file_var,
         )
 
     def _export_table_results(

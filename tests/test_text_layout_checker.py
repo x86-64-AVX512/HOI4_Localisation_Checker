@@ -228,6 +228,62 @@ class TextLayoutCheckerTests(unittest.TestCase):
             self.assertEqual(1, event_only.events_checked)
             self.assertEqual(0, event_only.welcome_checked)
 
+    def test_russian_diagnostics_are_paired_with_english_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            mod, english = self.create_mod(root)
+            russian = mod / "localisation" / "russian" / "sample.yml"
+            russian.parent.mkdir(parents=True)
+            russian.write_bytes(
+                b"\xef\xbb\xbf"
+                + (
+                    'l_russian:\n FOCUS_A_desc:0 "123456789"\n'
+                    ' FOCUS_MISSING_desc:0 "123456789"\n'
+                ).encode("utf-8")
+            )
+            focus_path = mod / "common" / "national_focus" / "test.txt"
+            focus_path.write_text(
+                focus_path.read_text(encoding="utf-8")
+                + "focus = { id = FOCUS_MISSING }\n",
+                encoding="utf-8",
+            )
+
+            result = TextLayoutChecker().scan(
+                russian,
+                english_target=english,
+                mod_root=mod,
+                options=TextLayoutOptions(
+                    focus_enabled=True,
+                    focus_mode="length",
+                    focus_limit=5,
+                    events_enabled=False,
+                    welcome_enabled=False,
+                ),
+            )
+
+            self.assertEqual(1, result.english_files_checked)
+            self.assertEqual(5, result.english_entries_checked)
+            diagnostic = next(
+                item for item in result.diagnostics
+                if item.key == "FOCUS_A_desc"
+            )
+            issue = result.issue_for(diagnostic)
+            english_location = issue.diagnostic_for("english")
+            self.assertIsNotNone(english_location)
+            assert english_location is not None
+            self.assertEqual(english, english_location.path)
+            self.assertEqual("FOCUS_A_desc", english_location.key)
+
+            missing = next(
+                item for item in result.diagnostics
+                if item.key == "FOCUS_MISSING_desc"
+            )
+            fallback = result.issue_for(missing).diagnostic_for("english")
+            self.assertIsNotNone(fallback)
+            assert fallback is not None
+            self.assertEqual(english, fallback.path)
+            self.assertEqual(missing.line, fallback.line)
+
     def test_one_key_keeps_separate_evidence_for_multiple_roles(
         self,
     ) -> None:

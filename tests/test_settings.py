@@ -108,6 +108,8 @@ class SettingsTests(unittest.TestCase):
                     layout_event_limit=3300,
                     layout_welcome_enabled=True,
                     layout_welcome_limit=3350,
+                    layout_english_path=r"C:\Mod\localisation\english",
+                    layout_russian_path=r"C:\Mod\localisation\russian",
                     compare_english_path=r"C:\Mod\localisation\english",
                     compare_russian_path=r"C:\Mod\localisation\russian",
                     export_directory=r"D:\Checker exports",
@@ -142,6 +144,14 @@ class SettingsTests(unittest.TestCase):
             self.assertEqual(3300, loaded.layout_event_limit)
             self.assertTrue(loaded.layout_welcome_enabled)
             self.assertEqual(3350, loaded.layout_welcome_limit)
+            self.assertEqual(
+                r"C:\Mod\localisation\english",
+                loaded.layout_english_path,
+            )
+            self.assertEqual(
+                r"C:\Mod\localisation\russian",
+                loaded.layout_russian_path,
+            )
             self.assertEqual(
                 r"C:\Mod\localisation\english",
                 loaded.compare_english_path,
@@ -195,6 +205,8 @@ class SettingsTests(unittest.TestCase):
             self.assertEqual(3400, load_settings(path).layout_event_limit)
             self.assertTrue(load_settings(path).layout_welcome_enabled)
             self.assertEqual(3400, load_settings(path).layout_welcome_limit)
+            self.assertEqual("", load_settings(path).layout_english_path)
+            self.assertEqual("", load_settings(path).layout_russian_path)
             self.assertEqual("", load_settings(path).compare_english_path)
             self.assertEqual("", load_settings(path).compare_russian_path)
             self.assertEqual("", load_settings(path).export_directory)

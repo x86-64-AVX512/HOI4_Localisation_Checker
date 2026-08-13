@@ -101,7 +101,7 @@ class GuiTests(unittest.TestCase):
             (self.app_root / "settings.json").read_text(encoding="utf-8")
         )
         self.assertFalse(settings.check_russian_straight_quotes)
-        self.assertEqual(2, saved["format_version"])
+        self.assertEqual(3, saved["format_version"])
 
     def test_failed_setting_update_restores_gui_variable(self) -> None:
         self.app.check_tab.russian_straight_quotes_var.set(False)
@@ -151,6 +151,43 @@ class GuiTests(unittest.TestCase):
             "Настройки проверки текстов сохранены.",
             self.app.layout_tab.current_file_var.get(),
         )
+
+    def test_layout_requires_and_saves_matching_language_sources(self) -> None:
+        russian = self.app_root / "russian.yml"
+        english = self.app_root / "english.yml"
+        russian.write_text("russian", encoding="utf-8")
+        english.write_text("english", encoding="utf-8")
+
+        with patch.object(
+            gui_module.filedialog,
+            "askopenfilename",
+            side_effect=(str(russian), str(english)),
+        ):
+            self.app._select_layout_source("russian", "file")
+            self.app._select_layout_source("english", "file")
+
+        self.assertEqual(
+            (russian.resolve(), english.resolve()),
+            self.app._require_layout_sources(),
+        )
+        settings = load_settings(self.app_root / "settings.json")
+        self.assertEqual(str(russian.resolve()), settings.layout_russian_path)
+        self.assertEqual(str(english.resolve()), settings.layout_english_path)
+        self.assertTrue(
+            self.app.layout_tab.source_indicators["russian"].valid
+        )
+        self.assertTrue(
+            self.app.layout_tab.source_indicators["english"].valid
+        )
+
+    def test_missing_layout_sources_flash_blocking_requirements(self) -> None:
+        with patch.object(gui_module.messagebox, "showwarning"):
+            sources = self.app._require_layout_sources()
+
+        self.assertIsNone(sources)
+        for indicator in self.app.layout_tab.source_indicators.values():
+            self.assertEqual("#CF1020", indicator.widget.cget("background"))
+            indicator.stop_flashing()
 
     def test_main_table_export_preserves_visible_values(self) -> None:
         destination = self.app_root / "exports" / "results.csv"

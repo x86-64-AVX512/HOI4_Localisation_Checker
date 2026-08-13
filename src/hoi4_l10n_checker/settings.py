@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Iterable
 
-CURRENT_SETTINGS_FORMAT_VERSION = 2
+CURRENT_SETTINGS_FORMAT_VERSION = 3
 
 
 class SettingsError(RuntimeError):
@@ -32,6 +32,8 @@ class AppSettings:
     layout_event_limit: int = 3400
     layout_welcome_enabled: bool = True
     layout_welcome_limit: int = 3400
+    layout_english_path: str = ""
+    layout_russian_path: str = ""
     compare_english_path: str = ""
     compare_russian_path: str = ""
     export_directory: str = ""
@@ -51,6 +53,8 @@ _STRING_FIELDS = (
     "context_mod_path",
     "hoi4_install_path",
     "layout_focus_preview_cli_path",
+    "layout_english_path",
+    "layout_russian_path",
     "compare_english_path",
     "compare_russian_path",
     "export_directory",
@@ -100,6 +104,11 @@ def _migrate_settings_data(raw_data: object) -> dict[str, object]:
         if version == 1:
             data.pop("layout_focus_preview_policy", None)
             version = 2
+            continue
+        if version == 2:
+            data.setdefault("layout_english_path", "")
+            data.setdefault("layout_russian_path", "")
+            version = 3
             continue
         raise SettingsError(
             f"Неизвестен способ обновления формата настроек {version}."

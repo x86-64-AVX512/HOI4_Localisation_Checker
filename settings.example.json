@@ -1,5 +1,5 @@
 {
-  "format_version": 2,
+  "format_version": 3,
   "excluded_characters": [],
   "notepad_plus_plus_path": "",
   "notepad_plus_plus_fullscreen": false,
@@ -16,6 +16,8 @@
   "layout_event_limit": 3400,
   "layout_welcome_enabled": true,
   "layout_welcome_limit": 3400,
+  "layout_english_path": "",
+  "layout_russian_path": "",
   "compare_english_path": "",
   "compare_russian_path": "",
   "export_directory": ""

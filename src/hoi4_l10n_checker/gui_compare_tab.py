@@ -5,6 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 from tkinter import ttk
 
+from .gui_requirements import RequirementIndicator
 from .localisation_compare import (
     ComparisonIssue,
     ComparisonLanguage,
@@ -96,12 +97,18 @@ class ComparisonTab:
             settings_frame,
             text="Папка английской локализации:",
         ).grid(row=0, column=0, sticky=tk.W)
-        self.english_path_var = tk.StringVar()
-        ttk.Label(
-            settings_frame,
-            textvariable=self.english_path_var,
-            anchor=tk.W,
-        ).grid(row=0, column=1, sticky="ew", padx=(8, 8))
+        self.path_indicators: dict[
+            ComparisonLanguage,
+            RequirementIndicator,
+        ] = {}
+        self.english_path_indicator = RequirementIndicator(settings_frame)
+        self.english_path_indicator.grid(
+            row=0,
+            column=1,
+            sticky="ew",
+            padx=(8, 8),
+        )
+        self.path_indicators["english"] = self.english_path_indicator
         self.english_path_button = ttk.Button(
             settings_frame,
             text="Выбрать…",
@@ -113,18 +120,15 @@ class ComparisonTab:
             settings_frame,
             text="Папка русской локализации:",
         ).grid(row=1, column=0, sticky=tk.W, pady=(8, 0))
-        self.russian_path_var = tk.StringVar()
-        ttk.Label(
-            settings_frame,
-            textvariable=self.russian_path_var,
-            anchor=tk.W,
-        ).grid(
+        self.russian_path_indicator = RequirementIndicator(settings_frame)
+        self.russian_path_indicator.grid(
             row=1,
             column=1,
             sticky="ew",
             padx=(8, 8),
             pady=(8, 0),
         )
+        self.path_indicators["russian"] = self.russian_path_indicator
         self.russian_path_button = ttk.Button(
             settings_frame,
             text="Выбрать…",
@@ -326,19 +330,36 @@ class ComparisonTab:
         self.refresh_controls()
 
     def set_paths(self, english_path: str, russian_path: str) -> None:
-        for raw_path, variable, label in (
-            (english_path, self.english_path_var, "английская"),
-            (russian_path, self.russian_path_var, "русская"),
+        for raw_path, indicator, label in (
+            (
+                english_path,
+                self.english_path_indicator,
+                "английская",
+            ),
+            (
+                russian_path,
+                self.russian_path_indicator,
+                "русская",
+            ),
         ):
             if not raw_path:
-                variable.set(f"не выбрана — {label} папка обязательна")
+                indicator.set(
+                    False,
+                    f"не выбрана — {label} папка обязательна",
+                )
                 continue
             path = Path(raw_path)
-            variable.set(
-                str(path)
-                if path.is_dir()
-                else f"папка недоступна: {path}"
+            valid = path.is_dir()
+            indicator.set(
+                valid,
+                str(path) if valid else f"папка недоступна: {path}",
             )
+
+    def flash_path_requirement(
+        self,
+        language: ComparisonLanguage,
+    ) -> None:
+        self.path_indicators[language].flash()
 
     def set_busy(self, busy: bool) -> None:
         self.busy = busy

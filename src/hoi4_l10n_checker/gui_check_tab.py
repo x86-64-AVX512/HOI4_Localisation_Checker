@@ -7,6 +7,7 @@ from tkinter import ttk
 from typing import cast
 
 from .checker import GlyphMode, ScanResult
+from .gui_requirements import RequirementIndicator
 from .models import GLYPH_DIAGNOSTIC_CODES, Diagnostic
 
 OpenDiagnosticCallback = Callable[[Diagnostic | None, tk.StringVar], str]
@@ -206,12 +207,13 @@ class LocalisationCheckTab:
             context_path_frame,
             text="Папка мода для контекстного режима:",
         ).grid(row=0, column=0, sticky=tk.W)
-        self.context_mod_var = tk.StringVar()
-        ttk.Label(
-            context_path_frame,
-            textvariable=self.context_mod_var,
-            anchor=tk.W,
-        ).grid(row=0, column=1, sticky="ew", padx=(8, 8))
+        self.context_indicator = RequirementIndicator(context_path_frame)
+        self.context_indicator.grid(
+            row=0,
+            column=1,
+            sticky="ew",
+            padx=(8, 8),
+        )
         self.context_mod_button = ttk.Button(
             context_path_frame,
             text="Выбрать…",
@@ -430,8 +432,11 @@ class LocalisationCheckTab:
     def set_exceptions_count(self, count: int) -> None:
         self.exceptions_button.configure(text=f"Исключения… ({count})")
 
-    def set_context_status(self, message: str) -> None:
-        self.context_mod_var.set(message)
+    def set_context_status(self, message: str, valid: bool = False) -> None:
+        self.context_indicator.set(valid, message)
+
+    def flash_context_requirement(self) -> None:
+        self.context_indicator.flash()
 
     def set_status(self, message: str) -> None:
         self.current_file_var.set(message)
