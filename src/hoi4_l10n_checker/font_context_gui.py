@@ -34,6 +34,7 @@ from .font_context_types import (
     ROLE_TOOLTIP,
     ROLE_VICTORY_POINT_NAME,
     ROLE_WELCOME_TEXT,
+    ROLE_WELCOME_TITLE,
     RoleEvidence,
     record_role_evidence,
 )
@@ -114,6 +115,7 @@ def index_gui_blocks(
         welcome_body = (
             welcome_context and re.fullmatch(r"tab_\d+_text", name) is not None
         )
+        welcome_title = welcome_context and "header" in name
 
         if welcome_body:
             role_fonts[ROLE_WELCOME_TEXT].update(fonts)
@@ -136,6 +138,30 @@ def index_gui_blocks(
                         )
                     for function_name in localisation_calls(text):
                         dynamic_function_roles[function_name].add(ROLE_WELCOME_TEXT)
+
+        if welcome_title:
+            role_fonts[ROLE_WELCOME_TITLE].update(fonts)
+            for property_name in _DIRECT_TEXT_PROPERTIES:
+                for text in block.properties.get(property_name, []):
+                    if text in localisation_keys:
+                        key_roles[text].add(ROLE_WELCOME_TITLE)
+                        record_role_evidence(
+                            role_evidence,
+                            text,
+                            ROLE_WELCOME_TITLE,
+                            "confirmed",
+                            (
+                                "Ключ напрямую назначен заголовку "
+                                "вступительного экрана."
+                            ),
+                            block=block,
+                            property_name=property_name,
+                            property_value=text,
+                        )
+                    for function_name in localisation_calls(text):
+                        dynamic_function_roles[function_name].add(
+                            ROLE_WELCOME_TITLE
+                        )
 
         if fonts:
             for property_name in _DIRECT_TEXT_PROPERTIES:

@@ -173,6 +173,9 @@ class CheckerApplication:
             event_limit=settings.layout_event_limit,
             welcome_enabled=settings.layout_welcome_enabled,
             welcome_limit=settings.layout_welcome_limit,
+            title_newline_enabled=(
+                settings.layout_title_newline_enabled
+            ),
         )
         self.layout_tab = TextLayoutTab(
             root=self.root,
@@ -471,6 +474,9 @@ class CheckerApplication:
             layout_event_limit=options.event_limit,
             layout_welcome_enabled=options.welcome_enabled,
             layout_welcome_limit=options.welcome_limit,
+            layout_title_newline_enabled=(
+                options.title_newline_enabled
+            ),
         )
 
     def _restore_layout_variables(self) -> None:
@@ -490,6 +496,9 @@ class CheckerApplication:
                 event_limit=settings.layout_event_limit,
                 welcome_enabled=settings.layout_welcome_enabled,
                 welcome_limit=settings.layout_welcome_limit,
+                title_newline_enabled=(
+                    settings.layout_title_newline_enabled
+                ),
             )
         )
 

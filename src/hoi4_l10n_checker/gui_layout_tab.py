@@ -379,6 +379,26 @@ class TextLayoutTab:
             entry.bind("<FocusOut>", on_controls_changed)
             entry.bind("<Return>", on_controls_changed)
 
+        self.title_newline_var = tk.BooleanVar(
+            value=options.title_newline_enabled
+        )
+        self.title_newline_button = ttk.Checkbutton(
+            checks,
+            text=(
+                r"Искать \n в заголовках фокусов, ивентов и "
+                "вступительных экранов"
+            ),
+            variable=self.title_newline_var,
+            command=on_controls_changed,
+        )
+        self.title_newline_button.grid(
+            row=1,
+            column=0,
+            columnspan=3,
+            sticky=tk.W,
+            pady=(8, 0),
+        )
+
         ttk.Label(
             checks,
             text=(
@@ -388,7 +408,7 @@ class TextLayoutTab:
             ),
             justify=tk.LEFT,
         ).grid(
-            row=1,
+            row=2,
             column=0,
             columnspan=3,
             sticky=tk.W,
@@ -397,7 +417,7 @@ class TextLayoutTab:
 
         context_frame = ttk.Frame(checks)
         context_frame.grid(
-            row=2,
+            row=3,
             column=0,
             columnspan=3,
             sticky="ew",
@@ -697,6 +717,7 @@ class TextLayoutTab:
                 self.welcome_limit_var.get(),
                 "вступительных экранов",
             ),
+            title_newline_enabled=self.title_newline_var.get(),
         )
 
     def restore_options(self, options: TextLayoutOptions) -> None:
@@ -710,6 +731,7 @@ class TextLayoutTab:
         self.event_limit_var.set(str(options.event_limit))
         self.welcome_enabled_var.set(options.welcome_enabled)
         self.welcome_limit_var.set(str(options.welcome_limit))
+        self.title_newline_var.set(options.title_newline_enabled)
 
     def set_busy(self, busy: bool) -> None:
         self.busy = busy
@@ -725,6 +747,7 @@ class TextLayoutTab:
             self.focus_enabled_button,
             self.events_enabled_button,
             self.welcome_enabled_button,
+            self.title_newline_button,
             *self.source_buttons,
         ):
             widget.configure(state=base_state)
@@ -732,6 +755,7 @@ class TextLayoutTab:
             self.focus_enabled_var.get()
             or self.events_enabled_var.get()
             or self.welcome_enabled_var.get()
+            or self.title_newline_var.get()
         )
         scan_state = (
             tk.NORMAL if not self.busy and any_check_enabled else tk.DISABLED
@@ -920,6 +944,7 @@ class TextLayoutTab:
             f"фокусов: {result.focus_checked}; "
             f"ивентов: {result.events_checked}; "
             f"вступительных экранов: {result.welcome_checked}; "
+            f"заголовков: {result.titles_checked}; "
             f"предупреждений: {result.warning_count}."
         )
         if result.preview_checked:
@@ -936,6 +961,7 @@ class TextLayoutTab:
             f"Проверка завершена: {result.root}; "
             f"превышений длины: {result.length_warning_count}; "
             f"фокусов с \\n: {result.newline_warning_count}; "
+            f"заголовков с \\n: {result.title_newline_warning_count}; "
             f"GUI-файлов: {result.context_gui_files}; "
             f"скриптовых файлов: {result.context_script_files}"
         )

@@ -14,8 +14,11 @@ from .focus_preview_cli import (
 )
 from .font_context import (
     ROLE_EVENT_DESCRIPTION,
+    ROLE_EVENT_TITLE,
     ROLE_FOCUS_DESCRIPTION,
+    ROLE_FOCUS_NAME,
     ROLE_WELCOME_TEXT,
+    ROLE_WELCOME_TITLE,
     FontContextIndex,
     RoleEvidence,
     build_font_context,
@@ -57,6 +60,7 @@ class TextLayoutOptions:
     event_limit: int = 3400
     welcome_enabled: bool = True
     welcome_limit: int = 3400
+    title_newline_enabled: bool = False
 
     def validate(self) -> None:
         if self.focus_mode not in _FOCUS_MODES:
@@ -88,6 +92,7 @@ class TextLayoutOptions:
             self.focus_enabled
             or self.events_enabled
             or self.welcome_enabled
+            or self.title_newline_enabled
         ):
             raise ValueError("Нужно включить хотя бы одну проверку.")
 
@@ -101,6 +106,7 @@ class TextLayoutResult:
     events_checked: int
     welcome_checked: int
     diagnostics: list[Diagnostic]
+    titles_checked: int = 0
     english_root: Path | None = None
     english_files_checked: int = 0
     english_entries_checked: int = 0
@@ -131,6 +137,13 @@ class TextLayoutResult:
     def newline_warning_count(self) -> int:
         return sum(
             item.code == "FOCUS_NEWLINE"
+            for item in self.diagnostics
+        )
+
+    @property
+    def title_newline_warning_count(self) -> int:
+        return sum(
+            item.code == "TITLE_NEWLINE"
             for item in self.diagnostics
         )
 
@@ -273,6 +286,36 @@ def _newline_escape_columns(entry: LocalisationEntry) -> list[int]:
             continue
         cursor += 1
     return result
+
+
+def _newline_diagnostic(
+    entry: LocalisationEntry,
+    *,
+    code: str,
+    text_kind: str,
+    message_label: str,
+    role_confidence: str,
+    role_evidence: str,
+) -> Diagnostic | None:
+    columns = _newline_escape_columns(entry)
+    if not columns:
+        return None
+    return Diagnostic(
+        severity="warning",
+        code=code,
+        path=entry.path,
+        line=entry.line,
+        column=columns[0],
+        message=(
+            f"{message_label} содержит {len(columns)} перенос(а) \\n."
+        ),
+        key=entry.key,
+        character="\\n",
+        text_kind=text_kind,
+        selection_length=2,
+        role_confidence=role_confidence,
+        role_evidence=role_evidence,
+    )
 
 
 def _length_diagnostic(
@@ -500,6 +543,7 @@ class TextLayoutChecker:
         focus_checked = 0
         events_checked = 0
         welcome_checked = 0
+        titles_checked = 0
         diagnostics: list[Diagnostic] = []
         exact_candidates: list[_ExactFocusCandidate] = []
 
@@ -514,27 +558,16 @@ class TextLayoutChecker:
                     ROLE_FOCUS_DESCRIPTION,
                 )
                 if options.focus_mode == "newline":
-                    columns = _newline_escape_columns(entry)
-                    if columns:
-                        diagnostics.append(
-                            Diagnostic(
-                                severity="warning",
-                                code="FOCUS_NEWLINE",
-                                path=entry.path,
-                                line=entry.line,
-                                column=columns[0],
-                                message=(
-                                    "Описание фокуса содержит "
-                                    f"{len(columns)} перенос(а) \\n."
-                                ),
-                                key=entry.key,
-                                character="\\n",
-                                text_kind="Фокус",
-                                selection_length=2,
-                                role_confidence=confidence,
-                                role_evidence=evidence,
-                            )
-                        )
+                    diagnostic = _newline_diagnostic(
+                        entry,
+                        code="FOCUS_NEWLINE",
+                        text_kind="Фокус",
+                        message_label="Описание фокуса",
+                        role_confidence=confidence,
+                        role_evidence=evidence,
+                    )
+                    if diagnostic is not None:
+                        diagnostics.append(diagnostic)
                 elif options.focus_mode == "length":
                     diagnostic = _length_diagnostic(
                         entry,
@@ -572,6 +605,35 @@ class TextLayoutChecker:
                 )
                 if diagnostic is not None:
                     diagnostics.append(diagnostic)
+
+            if options.title_newline_enabled:
+                title_roles = (
+                    (ROLE_FOCUS_NAME, "Заголовок фокуса"),
+                    (ROLE_EVENT_TITLE, "Заголовок ивента"),
+                    (
+                        ROLE_WELCOME_TITLE,
+                        "Заголовок вступительного экрана",
+                    ),
+                )
+                for role, text_kind in title_roles:
+                    if role not in roles:
+                        continue
+                    titles_checked += 1
+                    confidence, evidence = _role_explanation(
+                        context,
+                        entry.key,
+                        role,
+                    )
+                    diagnostic = _newline_diagnostic(
+                        entry,
+                        code="TITLE_NEWLINE",
+                        text_kind=text_kind,
+                        message_label=text_kind,
+                        role_confidence=confidence,
+                        role_evidence=evidence,
+                    )
+                    if diagnostic is not None:
+                        diagnostics.append(diagnostic)
 
             if options.welcome_enabled and ROLE_WELCOME_TEXT in roles:
                 welcome_checked += 1
@@ -660,6 +722,7 @@ class TextLayoutChecker:
             events_checked=events_checked,
             welcome_checked=welcome_checked,
             diagnostics=diagnostics,
+            titles_checked=titles_checked,
             english_root=english_root,
             english_files_checked=len(english_files),
             english_entries_checked=len(english_entries),

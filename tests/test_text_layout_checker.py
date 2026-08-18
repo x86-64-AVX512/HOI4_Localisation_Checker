@@ -358,6 +358,85 @@ class TextLayoutCheckerTests(unittest.TestCase):
                 )
             )
 
+    def test_title_newlines_are_checked_independently_by_role(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            mod, localisation = self.create_mod(Path(temporary))
+            titles = localisation.parent / "titles.yml"
+            self.write_localisation(
+                titles,
+                [
+                    ' FOCUS_A:0 "Focus\\nTitle"',
+                    r' FOCUS_ESCAPED:0 "Focus\\nTitle"',
+                    ' EVENT_TITLE:0 "Event\\nTitle"',
+                    ' WELCOME_TITLE:0 "Welcome\\nTitle"',
+                    ' NO_ROLE_TITLE:0 "Ignored\\nTitle"',
+                ],
+            )
+            (mod / "events" / "test.txt").write_text(
+                (
+                    "country_event = {\n"
+                    " id = test.1\n"
+                    " title = EVENT_TITLE\n"
+                    " desc = EVENT_DESC\n"
+                    "}\n"
+                ),
+                encoding="utf-8",
+            )
+            with (mod / "interface" / "welcome.gui").open(
+                "a",
+                encoding="utf-8",
+            ) as gui:
+                gui.write(
+                    "containerWindowType = {\n"
+                    ' name = "welcome_screen_window"\n'
+                    " instantTextboxType = {\n"
+                    '  name = "tab_1_header"\n'
+                    '  font = "hoi_24header"\n'
+                    '  text = "WELCOME_TITLE"\n'
+                    " }\n"
+                    "}\n"
+                )
+
+            result = TextLayoutChecker().scan(
+                localisation.parent,
+                mod_root=mod,
+                options=TextLayoutOptions(
+                    focus_enabled=False,
+                    events_enabled=False,
+                    welcome_enabled=False,
+                    title_newline_enabled=True,
+                ),
+            )
+
+            self.assertEqual(4, result.titles_checked)
+            self.assertEqual(3, result.title_newline_warning_count)
+            warnings = {
+                diagnostic.key: diagnostic
+                for diagnostic in result.diagnostics
+            }
+            self.assertEqual(
+                {"FOCUS_A", "EVENT_TITLE", "WELCOME_TITLE"},
+                set(warnings),
+            )
+            self.assertEqual(
+                "Заголовок фокуса",
+                warnings["FOCUS_A"].text_kind,
+            )
+            self.assertEqual(
+                "Заголовок ивента",
+                warnings["EVENT_TITLE"].text_kind,
+            )
+            self.assertEqual(
+                "Заголовок вступительного экрана",
+                warnings["WELCOME_TITLE"].text_kind,
+            )
+            self.assertTrue(
+                all(item.character == "\\n" for item in warnings.values())
+            )
+            self.assertTrue(
+                all(item.selection_length == 2 for item in warnings.values())
+            )
+
     def test_exact_focus_mode_checks_every_focus_and_shows_only_red(
         self,
     ) -> None:

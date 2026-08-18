@@ -101,7 +101,7 @@ class GuiTests(unittest.TestCase):
             (self.app_root / "settings.json").read_text(encoding="utf-8")
         )
         self.assertFalse(settings.check_russian_straight_quotes)
-        self.assertEqual(3, saved["format_version"])
+        self.assertEqual(4, saved["format_version"])
 
     def test_failed_setting_update_restores_gui_variable(self) -> None:
         self.app.check_tab.russian_straight_quotes_var.set(False)
@@ -140,6 +140,7 @@ class GuiTests(unittest.TestCase):
     def test_layout_options_are_saved_through_extracted_tab(self) -> None:
         self.app.layout_tab.focus_limit_var.set("365")
         self.app.layout_tab.event_limit_var.set("3500")
+        self.app.layout_tab.title_newline_var.set(True)
 
         result = self.app._layout_controls_changed()
 
@@ -147,6 +148,7 @@ class GuiTests(unittest.TestCase):
         self.assertEqual("break", result)
         self.assertEqual(365, settings.layout_focus_limit)
         self.assertEqual(3500, settings.layout_event_limit)
+        self.assertTrue(settings.layout_title_newline_enabled)
         self.assertEqual(
             "Настройки проверки текстов сохранены.",
             self.app.layout_tab.current_file_var.get(),

@@ -46,6 +46,7 @@ class TextLayoutTabTests(unittest.TestCase):
         self.assertEqual("length", options.focus_mode)
         self.assertEqual(350, options.focus_limit)
         self.assertEqual("auto_ru", options.focus_preview_priority)
+        self.assertFalse(options.title_newline_enabled)
         self.assertEqual(
             "disabled",
             str(self.tab.preview_cli_button.cget("state")),
@@ -70,6 +71,11 @@ class TextLayoutTabTests(unittest.TestCase):
         self.tab.focus_enabled_var.set(False)
         self.tab.events_enabled_var.set(False)
         self.tab.welcome_enabled_var.set(False)
+        self.tab.title_newline_var.set(True)
+        self.tab.refresh_controls()
+        self.assertEqual("normal", str(self.tab.run_button.cget("state")))
+
+        self.tab.title_newline_var.set(False)
         self.tab.refresh_controls()
         self.assertEqual("disabled", str(self.tab.run_button.cget("state")))
 
@@ -86,6 +92,7 @@ class TextLayoutTabTests(unittest.TestCase):
             events_checked=12,
             welcome_checked=8,
             diagnostics=diagnostics,
+            titles_checked=6,
             context_gui_files=4,
             context_script_files=5,
         )
@@ -99,6 +106,7 @@ class TextLayoutTabTests(unittest.TestCase):
         ]
         self.assertEqual(["LONG_KEY", "SHORT_KEY"], visible_keys)
         self.assertIn("Файлов RU: 3", self.tab.summary_var.get())
+        self.assertIn("заголовков: 6", self.tab.summary_var.get())
         self.assertIn("GUI-файлов: 4", self.tab.current_file_var.get())
         self.assertEqual(
             "normal",

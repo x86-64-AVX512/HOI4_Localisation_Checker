@@ -36,6 +36,7 @@ __all__ = [
     "ROLE_CHARACTER_DESCRIPTION",
     "ROLE_DECISION_COST",
     "ROLE_MIO_NAME",
+    "ROLE_WELCOME_TITLE",
     "ROLE_WELCOME_TEXT",
     "RoleEvidence",
     "record_role_evidence",
@@ -70,6 +71,7 @@ ROLE_CHARACTER_NAME = "character_name"
 ROLE_CHARACTER_DESCRIPTION = "character_description"
 ROLE_DECISION_COST = "decision_cost"
 ROLE_MIO_NAME = "mio_name"
+ROLE_WELCOME_TITLE = "welcome_title"
 ROLE_WELCOME_TEXT = "welcome_text"
 
 

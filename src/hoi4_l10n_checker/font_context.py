@@ -17,10 +17,13 @@ from .font_context_semantics import collect_semantic_context
 from .font_context_types import (
     ROLE_COUNTRY_NAME,
     ROLE_EVENT_DESCRIPTION,
+    ROLE_EVENT_TITLE,
     ROLE_FOCUS_DESCRIPTION,
+    ROLE_FOCUS_NAME,
     ROLE_STATE_NAME,
     ROLE_TOOLTIP,
     ROLE_WELCOME_TEXT,
+    ROLE_WELCOME_TITLE,
     FontContextIndex,
     RoleEvidence,
 )
@@ -29,7 +32,10 @@ from .paradox_script import parse_blocks
 __all__ = [
     "FontContextIndex",
     "ROLE_EVENT_DESCRIPTION",
+    "ROLE_EVENT_TITLE",
     "ROLE_FOCUS_DESCRIPTION",
+    "ROLE_FOCUS_NAME",
+    "ROLE_WELCOME_TITLE",
     "ROLE_WELCOME_TEXT",
     "RoleEvidence",
     "build_font_context",

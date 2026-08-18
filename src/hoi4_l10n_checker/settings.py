@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Iterable
 
-CURRENT_SETTINGS_FORMAT_VERSION = 3
+CURRENT_SETTINGS_FORMAT_VERSION = 4
 
 
 class SettingsError(RuntimeError):
@@ -32,6 +32,7 @@ class AppSettings:
     layout_event_limit: int = 3400
     layout_welcome_enabled: bool = True
     layout_welcome_limit: int = 3400
+    layout_title_newline_enabled: bool = False
     layout_english_path: str = ""
     layout_russian_path: str = ""
     compare_english_path: str = ""
@@ -47,6 +48,7 @@ _BOOLEAN_FIELDS = (
     "layout_focus_enabled",
     "layout_events_enabled",
     "layout_welcome_enabled",
+    "layout_title_newline_enabled",
 )
 _STRING_FIELDS = (
     "notepad_plus_plus_path",
@@ -109,6 +111,10 @@ def _migrate_settings_data(raw_data: object) -> dict[str, object]:
             data.setdefault("layout_english_path", "")
             data.setdefault("layout_russian_path", "")
             version = 3
+            continue
+        if version == 3:
+            data.setdefault("layout_title_newline_enabled", False)
+            version = 4
             continue
         raise SettingsError(
             f"Неизвестен способ обновления формата настроек {version}."

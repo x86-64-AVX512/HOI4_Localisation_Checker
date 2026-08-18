@@ -12,6 +12,7 @@ from hoi4_l10n_checker.font_context_types import (
     ROLE_FOCUS_DESCRIPTION,
     ROLE_TOOLTIP,
     ROLE_WELCOME_TEXT,
+    ROLE_WELCOME_TITLE,
     RoleEvidence,
 )
 from hoi4_l10n_checker.paradox_script import parse_blocks
@@ -42,6 +43,16 @@ class FontContextGuiTests(unittest.TestCase):
                 '        font = "hoi_20b"\n'
                 '        text = "[GetWelcomeText]"\n'
                 "    }\n"
+                "    instantTextBoxType = {\n"
+                '        name = "tab_1_header"\n'
+                '        font = "hoi_24header"\n'
+                '        text = "WELCOME_HEADER"\n'
+                "    }\n"
+                "    instantTextBoxType = {\n"
+                '        name = "tab_2_header"\n'
+                '        font = "hoi_24header"\n'
+                '        text = "[GetWelcomeTitle]"\n'
+                "    }\n"
                 "}\n"
             ),
             source_path,
@@ -56,7 +67,7 @@ class FontContextGuiTests(unittest.TestCase):
 
         index_gui_blocks(
             blocks,
-            frozenset({"WELCOME_KEY"}),
+            frozenset({"WELCOME_KEY", "WELCOME_HEADER"}),
             key_fonts,
             key_roles,
             role_evidence,
@@ -69,10 +80,22 @@ class FontContextGuiTests(unittest.TestCase):
         self.assertEqual({"hoi_18mbs"}, role_fonts[ROLE_FOCUS_DESCRIPTION])
         self.assertEqual({"hoi_20b"}, key_fonts["WELCOME_KEY"])
         self.assertEqual({ROLE_WELCOME_TEXT}, key_roles["WELCOME_KEY"])
+        self.assertEqual(
+            {ROLE_WELCOME_TITLE},
+            key_roles["WELCOME_HEADER"],
+        )
+        self.assertEqual(
+            {"hoi_24header"},
+            role_fonts[ROLE_WELCOME_TITLE],
+        )
         self.assertEqual({"hoi_18mbs"}, dynamic_fonts["GetDynamicText"])
         self.assertEqual(
             {ROLE_WELCOME_TEXT},
             dynamic_roles["GetWelcomeText"],
+        )
+        self.assertEqual(
+            {ROLE_WELCOME_TITLE},
+            dynamic_roles["GetWelcomeTitle"],
         )
         evidence = next(iter(role_evidence[("WELCOME_KEY", ROLE_WELCOME_TEXT)]))
         self.assertEqual(source_path, evidence.source_path)

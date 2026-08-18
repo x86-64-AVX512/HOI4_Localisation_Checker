@@ -108,6 +108,7 @@ class SettingsTests(unittest.TestCase):
                     layout_event_limit=3300,
                     layout_welcome_enabled=True,
                     layout_welcome_limit=3350,
+                    layout_title_newline_enabled=True,
                     layout_english_path=r"C:\Mod\localisation\english",
                     layout_russian_path=r"C:\Mod\localisation\russian",
                     compare_english_path=r"C:\Mod\localisation\english",
@@ -144,6 +145,7 @@ class SettingsTests(unittest.TestCase):
             self.assertEqual(3300, loaded.layout_event_limit)
             self.assertTrue(loaded.layout_welcome_enabled)
             self.assertEqual(3350, loaded.layout_welcome_limit)
+            self.assertTrue(loaded.layout_title_newline_enabled)
             self.assertEqual(
                 r"C:\Mod\localisation\english",
                 loaded.layout_english_path,
@@ -205,6 +207,9 @@ class SettingsTests(unittest.TestCase):
             self.assertEqual(3400, load_settings(path).layout_event_limit)
             self.assertTrue(load_settings(path).layout_welcome_enabled)
             self.assertEqual(3400, load_settings(path).layout_welcome_limit)
+            self.assertFalse(
+                load_settings(path).layout_title_newline_enabled
+            )
             self.assertEqual("", load_settings(path).layout_english_path)
             self.assertEqual("", load_settings(path).layout_russian_path)
             self.assertEqual("", load_settings(path).compare_english_path)
@@ -260,6 +265,29 @@ class SettingsTests(unittest.TestCase):
                 CURRENT_SETTINGS_FORMAT_VERSION,
                 saved["format_version"],
             )
+
+    def test_version_three_settings_disable_title_check_by_default(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "settings.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "format_version": 3,
+                        "excluded_characters": [],
+                        "layout_english_path": r"C:\Mod\english",
+                        "layout_russian_path": r"C:\Mod\russian",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            settings = load_settings(path)
+
+            self.assertFalse(settings.layout_title_newline_enabled)
+            self.assertEqual(r"C:\Mod\english", settings.layout_english_path)
+            self.assertEqual(r"C:\Mod\russian", settings.layout_russian_path)
 
     def test_newer_settings_format_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
