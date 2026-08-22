@@ -273,11 +273,14 @@ class GuiTests(unittest.TestCase):
             duplicate_russian=0,
             parse_errors=0,
             issues=[issue],
+            english_files_excluded=2,
+            russian_files_excluded=1,
         )
 
         self.app.compare_tab.show_result(result)
 
         self.assertIn("Файлов: 4", self.app.compare_tab.summary_var.get())
+        self.assertIn("исключено: 3", self.app.compare_tab.summary_var.get())
         self.assertIn(
             "нет в русской — 1",
             self.app.compare_tab.status_var.get(),
@@ -289,6 +292,47 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(
             "normal",
             str(self.app.compare_tab.export_button.cget("state")),
+        )
+
+    def test_compare_file_exclusions_are_session_only_and_reset_per_root(
+        self,
+    ) -> None:
+        english = self.app_root / "english"
+        replacement = self.app_root / "english_replacement"
+        russian = self.app_root / "russian"
+        for path in (english, replacement, russian):
+            path.mkdir()
+        english_music = english / "music_l_english.yml"
+        russian_music = russian / "music_l_russian.yml"
+        english_music.touch()
+        russian_music.touch()
+
+        self.app.compare_tab.set_paths(str(english), str(russian))
+        self.app.compare_tab.replace_file_exclusions(
+            {
+                "english": {english_music},
+                "russian": {russian_music},
+            }
+        )
+
+        self.assertEqual(
+            frozenset({english_music.resolve()}),
+            self.app.compare_tab.excluded_files("english"),
+        )
+        self.assertEqual(
+            "normal",
+            str(self.app.compare_tab.file_exclusions_button.cget("state")),
+        )
+
+        self.app.compare_tab.set_paths(str(replacement), str(russian))
+
+        self.assertEqual(
+            frozenset(),
+            self.app.compare_tab.excluded_files("english"),
+        )
+        self.assertEqual(
+            frozenset({russian_music.resolve()}),
+            self.app.compare_tab.excluded_files("russian"),
         )
 
     def test_progress_and_failure_events_restore_ui_state(self) -> None:

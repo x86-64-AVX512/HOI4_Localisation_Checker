@@ -48,7 +48,7 @@ class TextLayoutTabTests(unittest.TestCase):
         self.assertEqual("auto_ru", options.focus_preview_priority)
         self.assertFalse(options.title_newline_enabled)
         self.assertEqual(
-            "disabled",
+            "normal",
             str(self.tab.preview_cli_button.cget("state")),
         )
 
@@ -74,10 +74,24 @@ class TextLayoutTabTests(unittest.TestCase):
         self.tab.title_newline_var.set(True)
         self.tab.refresh_controls()
         self.assertEqual("normal", str(self.tab.run_button.cget("state")))
+        self.assertEqual(
+            "normal",
+            str(self.tab.preview_cli_button.cget("state")),
+        )
 
         self.tab.title_newline_var.set(False)
         self.tab.refresh_controls()
         self.assertEqual("disabled", str(self.tab.run_button.cget("state")))
+        self.assertEqual(
+            "normal",
+            str(self.tab.preview_cli_button.cget("state")),
+        )
+
+        self.tab.set_busy(True)
+        self.assertEqual(
+            "disabled",
+            str(self.tab.preview_cli_button.cget("state")),
+        )
 
     def test_presents_and_sorts_layout_results(self) -> None:
         diagnostics = [

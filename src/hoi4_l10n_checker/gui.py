@@ -698,12 +698,16 @@ class CheckerApplication:
         english_root, russian_root = folders
 
         self.compare_tab.prepare_comparison(english_root, russian_root)
+        excluded_english = self.compare_tab.excluded_files("english")
+        excluded_russian = self.compare_tab.excluded_files("russian")
 
         def work(reporter: TaskReporter) -> LocalisationComparisonResult:
             return self.localisation_comparator.scan(
                 english_root,
                 russian_root,
                 progress=reporter.progress,
+                excluded_english_files=excluded_english,
+                excluded_russian_files=excluded_russian,
             )
 
         if self.tasks.start("comparison", work):

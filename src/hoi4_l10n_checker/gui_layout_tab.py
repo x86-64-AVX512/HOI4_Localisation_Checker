@@ -781,9 +781,11 @@ class TextLayoutTab:
                 else tk.DISABLED
             )
         )
-        preview_enabled = focus_enabled and self.focus_mode_var.get() == "exact"
         self.preview_cli_button.configure(
-            state=tk.NORMAL if preview_enabled else tk.DISABLED
+            state=tk.DISABLED if self.busy else tk.NORMAL
+        )
+        preview_enabled = (
+            not self.busy and self.focus_mode_var.get() == "exact"
         )
         self.preview_priority_combo.configure(
             state="readonly" if preview_enabled else tk.DISABLED

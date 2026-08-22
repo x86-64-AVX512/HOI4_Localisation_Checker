@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Callable, Literal
@@ -120,6 +121,8 @@ class LocalisationComparisonResult:
     duplicate_russian: int
     parse_errors: int
     issues: list[ComparisonIssue]
+    english_files_excluded: int = 0
+    russian_files_excluded: int = 0
 
     @property
     def difference_count(self) -> int:
@@ -128,6 +131,10 @@ class LocalisationComparisonResult:
     @property
     def duplicate_count(self) -> int:
         return self.duplicate_english + self.duplicate_russian
+
+    @property
+    def files_excluded(self) -> int:
+        return self.english_files_excluded + self.russian_files_excluded
 
 
 def _collect_files(localisation_root: Path) -> list[Path]:
@@ -430,6 +437,9 @@ class LocalisationComparator:
         english_root: Path,
         russian_root: Path,
         progress: ComparisonProgress | None = None,
+        *,
+        excluded_english_files: Iterable[Path] = (),
+        excluded_russian_files: Iterable[Path] = (),
     ) -> LocalisationComparisonResult:
         resolved_english = english_root.resolve()
         resolved_russian = russian_root.resolve()
@@ -444,8 +454,22 @@ class LocalisationComparator:
                 f"{resolved_russian}"
             )
 
-        english_files = _collect_files(resolved_english)
-        russian_files = _collect_files(resolved_russian)
+        all_english_files = _collect_files(resolved_english)
+        all_russian_files = _collect_files(resolved_russian)
+        excluded_english = {
+            Path(path).resolve() for path in excluded_english_files
+        }
+        excluded_russian = {
+            Path(path).resolve() for path in excluded_russian_files
+        }
+        english_files = [
+            path for path in all_english_files if path not in excluded_english
+        ]
+        russian_files = [
+            path for path in all_russian_files if path not in excluded_russian
+        ]
+        english_files_excluded = len(all_english_files) - len(english_files)
+        russian_files_excluded = len(all_russian_files) - len(russian_files)
         files_with_languages = [
             *(
                 (path, "l_english")
@@ -591,4 +615,6 @@ class LocalisationComparator:
             duplicate_russian=duplicate_russian,
             parse_errors=len(unique_parse_issues),
             issues=issues,
+            english_files_excluded=english_files_excluded,
+            russian_files_excluded=russian_files_excluded,
         )

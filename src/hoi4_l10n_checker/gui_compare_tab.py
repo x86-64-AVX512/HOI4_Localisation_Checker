@@ -5,6 +5,10 @@ from collections.abc import Callable
 from pathlib import Path
 from tkinter import ttk
 
+from .gui_compare_files import (
+    ComparisonFileExclusions,
+    ComparisonFilesDialog,
+)
 from .gui_requirements import RequirementIndicator
 from .localisation_compare import (
     ComparisonIssue,
@@ -46,6 +50,14 @@ class ComparisonTab:
         self.issues_by_item: dict[str, ComparisonIssue] = {}
         self.all_issues: list[ComparisonIssue] = []
         self.key_sort_descending = False
+        self.comparison_roots: dict[ComparisonLanguage, Path | None] = {
+            "english": None,
+            "russian": None,
+        }
+        self.file_exclusions: ComparisonFileExclusions = {
+            "english": set(),
+            "russian": set(),
+        }
 
         self.frame = ttk.Frame(notebook, padding=12)
         notebook.add(self.frame, text="Сравнение ключей")
@@ -142,14 +154,41 @@ class ComparisonTab:
         )
         ttk.Label(
             settings_frame,
+            text="Файлы сравнения:",
+        ).grid(row=2, column=0, sticky=tk.W, pady=(8, 0))
+        self.file_exclusions_var = tk.StringVar()
+        ttk.Label(
+            settings_frame,
+            textvariable=self.file_exclusions_var,
+        ).grid(
+            row=2,
+            column=1,
+            sticky=tk.W,
+            padx=(8, 8),
+            pady=(8, 0),
+        )
+        self.file_exclusions_button = ttk.Button(
+            settings_frame,
+            text="Настроить…",
+            command=self.open_file_exclusions,
+        )
+        self.file_exclusions_button.grid(
+            row=2,
+            column=2,
+            sticky=tk.E,
+            pady=(8, 0),
+        )
+        ttk.Label(
+            settings_frame,
             text=(
                 "Обе папки проверяются рекурсивно. В английской части "
                 "учитываются записи под l_english:, в русской — под "
-                "l_russian:. Папки могут находиться где угодно."
+                "l_russian:. Папки могут находиться где угодно. Исключения "
+                "файлов действуют только в текущей сессии."
             ),
             justify=tk.LEFT,
         ).grid(
-            row=2,
+            row=3,
             column=0,
             columnspan=3,
             sticky=tk.W,
@@ -327,22 +366,26 @@ class ComparisonTab:
             label="Копировать ключ",
             command=self.copy_selected_key,
         )
+        self._refresh_file_exclusions_status()
         self.refresh_controls()
 
     def set_paths(self, english_path: str, russian_path: str) -> None:
-        for raw_path, indicator, label in (
+        for language, raw_path, indicator, label in (
             (
+                "english",
                 english_path,
                 self.english_path_indicator,
                 "английская",
             ),
             (
+                "russian",
                 russian_path,
                 self.russian_path_indicator,
                 "русская",
             ),
         ):
             if not raw_path:
+                self._set_comparison_root(language, None)
                 indicator.set(
                     False,
                     f"не выбрана — {label} папка обязательна",
@@ -350,10 +393,80 @@ class ComparisonTab:
                 continue
             path = Path(raw_path)
             valid = path.is_dir()
+            self._set_comparison_root(
+                language,
+                path.resolve() if valid else None,
+            )
             indicator.set(
                 valid,
                 str(path) if valid else f"папка недоступна: {path}",
             )
+        self._refresh_file_exclusions_status()
+        self.refresh_controls()
+
+    def _set_comparison_root(
+        self,
+        language: ComparisonLanguage,
+        root: Path | None,
+    ) -> None:
+        if self.comparison_roots[language] == root:
+            return
+        self.comparison_roots[language] = root
+        self.file_exclusions[language].clear()
+
+    def excluded_files(
+        self,
+        language: ComparisonLanguage,
+    ) -> frozenset[Path]:
+        return frozenset(self.file_exclusions[language])
+
+    def replace_file_exclusions(
+        self,
+        exclusions: ComparisonFileExclusions,
+    ) -> None:
+        self.file_exclusions = {
+            language: {path.resolve() for path in exclusions[language]}
+            for language in ("english", "russian")
+        }
+        self._refresh_file_exclusions_status()
+
+    def open_file_exclusions(self) -> None:
+        roots = self._available_comparison_roots()
+        if roots is None:
+            self.root.bell()
+            self.status_var.set(
+                "Сначала выберите обе папки локализации."
+            )
+            return
+        result = ComparisonFilesDialog(
+            self.root,
+            roots,
+            self.file_exclusions,
+        ).show()
+        if result is None:
+            return
+        self.replace_file_exclusions(result)
+        self.status_var.set(
+            "Временный список файлов сравнения обновлён."
+        )
+
+    def _available_comparison_roots(
+        self,
+    ) -> dict[ComparisonLanguage, Path] | None:
+        english = self.comparison_roots["english"]
+        russian = self.comparison_roots["russian"]
+        if english is None or russian is None:
+            return None
+        if not english.is_dir() or not russian.is_dir():
+            return None
+        return {"english": english, "russian": russian}
+
+    def _refresh_file_exclusions_status(self) -> None:
+        english = len(self.file_exclusions["english"])
+        russian = len(self.file_exclusions["russian"])
+        self.file_exclusions_var.set(
+            f"временно исключено: EN — {english}, RU — {russian}"
+        )
 
     def flash_path_requirement(
         self,
@@ -372,6 +485,14 @@ class ComparisonTab:
         self.clear_button.configure(state=state)
         self.english_path_button.configure(state=state)
         self.russian_path_button.configure(state=state)
+        self.file_exclusions_button.configure(
+            state=(
+                tk.NORMAL
+                if not self.busy
+                and self._available_comparison_roots() is not None
+                else tk.DISABLED
+            )
+        )
         self.filter_combo.configure(
             state=tk.DISABLED if self.busy else "readonly"
         )
@@ -403,7 +524,11 @@ class ComparisonTab:
     def prepare_comparison(self, english_root: Path, russian_root: Path) -> None:
         self.clear_results()
         self.summary_var.set("Чтение файлов локализации…")
-        self.status_var.set(f"EN: {english_root}; RU: {russian_root}")
+        excluded = sum(len(paths) for paths in self.file_exclusions.values())
+        suffix = f"; временно исключено: {excluded}" if excluded else ""
+        self.status_var.set(
+            f"EN: {english_root}; RU: {russian_root}{suffix}"
+        )
 
     def update_progress(self, current: int, total: int, path: Path) -> None:
         self.progress.configure(maximum=total, value=current)
@@ -413,6 +538,9 @@ class ComparisonTab:
         self.summary_var.set(
             f"Файлов: {result.files_checked} "
             f"(EN: {result.english_files}, RU: {result.russian_files}); "
+            f"исключено: {result.files_excluded} "
+            f"(EN: {result.english_files_excluded}, "
+            f"RU: {result.russian_files_excluded}); "
             f"уникальных ключей EN: {result.english_keys}, "
             f"RU: {result.russian_keys}; совпадают: {result.common_keys}."
         )

@@ -145,6 +145,57 @@ class LocalisationComparatorTests(unittest.TestCase):
             self.assertEqual("UNCLOSED_QUOTE", errors[0].code)
             self.assertEqual("error", errors[0].severity)
 
+    def test_excludes_selected_files_for_current_comparison(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            mod = Path(temporary) / "mod"
+            english_root = mod / "localisation" / "english"
+            russian_root = mod / "localisation" / "russian"
+            english_main = english_root / "main_l_english.yml"
+            english_music = english_root / "music_l_english.yml"
+            russian_main = russian_root / "main_l_russian.yml"
+            russian_music = russian_root / "music_l_russian.yml"
+            self.write_localisation(
+                english_main,
+                "l_english",
+                [' MAIN:0 "Main"'],
+            )
+            self.write_localisation(
+                english_music,
+                "l_english",
+                [' MUSIC_ONLY_EN:0 "Song"'],
+            )
+            self.write_localisation(
+                russian_main,
+                "l_russian",
+                [' MAIN:0 "Основной"'],
+            )
+            self.write_localisation(
+                russian_music,
+                "l_russian",
+                [' MUSIC_ONLY_RU:0 "Песня"'],
+            )
+            progress = []
+
+            result = LocalisationComparator().scan(
+                english_root,
+                russian_root,
+                progress=lambda current, total, path: progress.append(
+                    (current, total, path)
+                ),
+                excluded_english_files=(english_music,),
+                excluded_russian_files=(russian_music,),
+            )
+
+            self.assertEqual(2, result.files_checked)
+            self.assertEqual(1, result.english_files)
+            self.assertEqual(1, result.russian_files)
+            self.assertEqual(1, result.english_files_excluded)
+            self.assertEqual(1, result.russian_files_excluded)
+            self.assertEqual(2, result.files_excluded)
+            self.assertEqual(1, result.common_keys)
+            self.assertEqual([], result.issues)
+            self.assertEqual(2, len(progress))
+
     def test_requires_localisation_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             valid = Path(temporary) / "valid"
