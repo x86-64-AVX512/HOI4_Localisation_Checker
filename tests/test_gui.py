@@ -5,6 +5,7 @@ import json
 import tempfile
 import tkinter as tk
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -333,6 +334,67 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(
             frozenset({russian_music.resolve()}),
             self.app.compare_tab.excluded_files("russian"),
+        )
+
+    def test_compare_context_menu_accumulates_files_until_manual_rerun(
+        self,
+    ) -> None:
+        english = self.app_root / "english"
+        russian = self.app_root / "russian"
+        english.mkdir()
+        russian.mkdir()
+        english_file = english / "music_l_english.yml"
+        russian_file = russian / "music_l_russian.yml"
+        second_english_file = english / "other_l_english.yml"
+        english_file.touch()
+        russian_file.touch()
+        second_english_file.touch()
+        self.app.compare_tab.set_paths(str(english), str(russian))
+        issue = replace(
+            self._comparison_issue("missing_russian", "MUSIC_KEY", 10),
+            path=english_file,
+            english_path=english_file,
+            english_line=10,
+            english_column=2,
+            russian_path=russian_file,
+            russian_line=10,
+            russian_column=2,
+        )
+        second_issue = replace(
+            self._comparison_issue("missing_russian", "OTHER_KEY", 20),
+            path=second_english_file,
+            english_path=second_english_file,
+            english_line=20,
+            english_column=2,
+        )
+        self.app.compare_tab.all_issues = [issue, second_issue]
+        self.app.compare_tab.apply_filter()
+        item = self.app.compare_tab.table.get_children("")[0]
+        self.app.compare_tab.table.selection_set(item)
+
+        result = self.app.compare_tab._exclude_selected(
+            ("english", "russian")
+        )
+        remaining_item = self.app.compare_tab.table.get_children("")[1]
+        self.app.compare_tab.table.selection_set(remaining_item)
+        second_result = self.app.compare_tab._exclude_selected(("english",))
+
+        self.assertEqual("break", result)
+        self.assertEqual("break", second_result)
+        self.assertEqual(2, len(self.app.compare_tab.table.get_children("")))
+        self.assertEqual(
+            frozenset(
+                {english_file.resolve(), second_english_file.resolve()}
+            ),
+            self.app.compare_tab.excluded_files("english"),
+        )
+        self.assertEqual(
+            frozenset({russian_file.resolve()}),
+            self.app.compare_tab.excluded_files("russian"),
+        )
+        self.assertIn(
+            "Нажмите «Сравнить локализации»",
+            self.app.compare_tab.status_var.get(),
         )
 
     def test_progress_and_failure_events_restore_ui_state(self) -> None:

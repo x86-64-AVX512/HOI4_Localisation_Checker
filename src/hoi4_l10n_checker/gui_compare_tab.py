@@ -362,6 +362,26 @@ class ComparisonTab:
             command=lambda: self._open_selected(("english", "russian")),
         )
         self.context_menu.add_separator()
+        self.exclusion_menu = tk.Menu(self.context_menu, tearoff=False)
+        self.exclusion_menu.add_command(
+            label="Английский файл",
+            command=lambda: self._exclude_selected(("english",)),
+        )
+        self.exclusion_menu.add_command(
+            label="Русский файл",
+            command=lambda: self._exclude_selected(("russian",)),
+        )
+        self.exclusion_menu.add_command(
+            label="Оба файла",
+            command=lambda: self._exclude_selected(
+                ("english", "russian")
+            ),
+        )
+        self.context_menu.add_cascade(
+            label="Исключить из сравнения",
+            menu=self.exclusion_menu,
+        )
+        self.context_menu.add_separator()
         self.context_menu.add_command(
             label="Копировать ключ",
             command=self.copy_selected_key,
@@ -757,10 +777,84 @@ class ComparisonTab:
             "Копировать ключ",
             state=tk.NORMAL if issue is not None and issue.key else tk.DISABLED,
         )
+        english_excludable = (
+            not self.busy
+            and self._exclusion_path(issue, "english") is not None
+        )
+        russian_excludable = (
+            not self.busy
+            and self._exclusion_path(issue, "russian") is not None
+        )
+        self.exclusion_menu.entryconfigure(
+            "Английский файл",
+            state=tk.NORMAL if english_excludable else tk.DISABLED,
+        )
+        self.exclusion_menu.entryconfigure(
+            "Русский файл",
+            state=tk.NORMAL if russian_excludable else tk.DISABLED,
+        )
+        self.exclusion_menu.entryconfigure(
+            "Оба файла",
+            state=(
+                tk.NORMAL
+                if english_excludable and russian_excludable
+                else tk.DISABLED
+            ),
+        )
+        self.context_menu.entryconfigure(
+            "Исключить из сравнения",
+            state=(
+                tk.NORMAL
+                if english_excludable or russian_excludable
+                else tk.DISABLED
+            ),
+        )
         try:
             self.context_menu.tk_popup(event.x_root, event.y_root)
         finally:
             self.context_menu.grab_release()
+        return "break"
+
+    def _exclusion_path(
+        self,
+        issue: ComparisonIssue | None,
+        language: ComparisonLanguage,
+    ) -> Path | None:
+        if issue is None:
+            return None
+        diagnostic = issue.diagnostic_for(language)
+        root = self.comparison_roots[language]
+        if diagnostic is None or root is None:
+            return None
+        path = diagnostic.path.resolve()
+        try:
+            path.relative_to(root)
+        except ValueError:
+            return None
+        if not path.is_file() or path in self.file_exclusions[language]:
+            return None
+        return path
+
+    def _exclude_selected(
+        self,
+        languages: tuple[ComparisonLanguage, ...],
+    ) -> str:
+        issue = self.selected_issue()
+        added: list[tuple[ComparisonLanguage, Path]] = []
+        for language in languages:
+            path = self._exclusion_path(issue, language)
+            if path is None:
+                continue
+            self.file_exclusions[language].add(path)
+            added.append((language, path))
+        if not added:
+            self.root.bell()
+            return "break"
+        self._refresh_file_exclusions_status()
+        self.status_var.set(
+            f"Добавлено временных исключений: {len(added)}. "
+            "Нажмите «Сравнить локализации», чтобы применить их."
+        )
         return "break"
 
     def _open_selected(
