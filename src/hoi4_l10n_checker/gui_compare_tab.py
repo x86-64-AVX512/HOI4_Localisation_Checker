@@ -3,7 +3,7 @@ from __future__ import annotations
 import tkinter as tk
 from collections.abc import Callable
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import ttk
 
 from .gui_compare_files import (
     ComparisonFileExclusions,
@@ -47,7 +47,6 @@ class ComparisonTab:
         self._on_open_languages = on_open_languages
         self._on_export = on_export
         self.busy = False
-        self.assembly_mod_root: Path | None = None
         self.issues_by_item: dict[str, ComparisonIssue] = {}
         self.all_issues: list[ComparisonIssue] = []
         self.key_sort_descending = False
@@ -195,21 +194,6 @@ class ComparisonTab:
             sticky=tk.W,
             pady=(8, 0),
         )
-        self.assembly_mod_var = tk.StringVar(
-            value="не выбран — служебные части сравниваются как обычные ключи"
-        )
-        ttk.Label(settings_frame, text="Мод для scripted-сборок:").grid(
-            row=4, column=0, sticky=tk.W, pady=(8, 0)
-        )
-        ttk.Label(
-            settings_frame, textvariable=self.assembly_mod_var, wraplength=620
-        ).grid(
-            row=4, column=1, sticky=tk.W, padx=8, pady=(8, 0)
-        )
-        self.assembly_mod_button = ttk.Button(
-            settings_frame, text="Выбрать…", command=self.select_assembly_mod
-        )
-        self.assembly_mod_button.grid(row=4, column=2, pady=(8, 0))
 
         filter_frame = ttk.Frame(self.frame)
         filter_frame.pack(fill=tk.X, pady=(10, 0))
@@ -521,7 +505,6 @@ class ComparisonTab:
         self.clear_button.configure(state=state)
         self.english_path_button.configure(state=state)
         self.russian_path_button.configure(state=state)
-        self.assembly_mod_button.configure(state=state)
         self.file_exclusions_button.configure(
             state=(
                 tk.NORMAL
@@ -588,35 +571,12 @@ class ComparisonTab:
             f"{result.duplicate_count}; ошибок разбора — "
             f"{result.parse_errors}."
         )
-        if result.assembly_helpers_omitted:
-            self.status_var.set(
-                self.status_var.get()
-                + f" Служебных ключей сборок: {result.assembly_helpers_omitted}."
-            )
         self.progress.configure(
             maximum=max(result.files_checked, 1),
             value=result.files_checked,
         )
         self.all_issues = list(result.issues)
         self.apply_filter()
-
-    def select_assembly_mod(self) -> None:
-        selected = filedialog.askdirectory(
-            parent=self.root, title="Мод с common/scripted_localisation"
-        )
-        if not selected:
-            return
-        path = Path(selected).resolve()
-        if not (path / "common/scripted_localisation").is_dir():
-            messagebox.showerror(
-                "Папка мода", "В папке нет common/scripted_localisation."
-            )
-            return
-        self.assembly_mod_root = path
-        self.assembly_mod_var.set(str(path))
-        self.status_var.set(
-            "Мод выбран. Следующее сравнение учтёт scripted-сборки."
-        )
 
     def show_failure(self) -> None:
         self.summary_var.set("Сравнение завершилось внутренней ошибкой.")

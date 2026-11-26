@@ -80,7 +80,6 @@ Copy-Item -LiteralPath (Join-Path $projectRoot "font_profile.json") -Destination
 Copy-Item -LiteralPath (Join-Path $projectRoot "settings.example.json") `
     -Destination (Join-Path $distRoot "settings.example.json")
 Copy-Item -LiteralPath (Join-Path $projectRoot "README.txt") -Destination $distRoot
-Copy-Item -LiteralPath (Join-Path $projectRoot "docs\LONG_TEXT_CONSTRUCTOR_RU.md") -Destination $distRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "LICENSE") -Destination $distRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "CHANGELOG.md") -Destination $distRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "THIRD_PARTY_NOTICES.md") -Destination $distRoot

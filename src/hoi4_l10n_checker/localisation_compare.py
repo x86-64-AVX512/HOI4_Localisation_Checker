@@ -8,7 +8,6 @@ from typing import Callable, Literal
 
 from .models import Diagnostic, LocalisationEntry
 from .parser import parse_localisation_file
-from .scripted_assemblies import analyse_assemblies, comparison_helpers
 
 ComparisonCategory = Literal[
     "missing_russian",
@@ -124,7 +123,6 @@ class LocalisationComparisonResult:
     issues: list[ComparisonIssue]
     english_files_excluded: int = 0
     russian_files_excluded: int = 0
-    assembly_helpers_omitted: int = 0
 
     @property
     def difference_count(self) -> int:
@@ -442,7 +440,6 @@ class LocalisationComparator:
         *,
         excluded_english_files: Iterable[Path] = (),
         excluded_russian_files: Iterable[Path] = (),
-        mod_root: Path | None = None,
     ) -> LocalisationComparisonResult:
         resolved_english = english_root.resolve()
         resolved_russian = russian_root.resolve()
@@ -531,41 +528,10 @@ class LocalisationComparator:
         russian = entries_by_language["l_russian"]
         english_keys = set(english)
         russian_keys = set(russian)
-        assembly_ignored: dict[str, set[str]] = {}
-        assembly_errors: list[ComparisonIssue] = []
-        if mod_root is not None:
-            flat_entries = [
-                entry for language_entries in entries_by_language.values()
-                for occurrences in language_entries.values() for entry in occurrences
-            ]
-            assemblies = analyse_assemblies(mod_root.resolve(), flat_entries)
-            assembly_ignored = comparison_helpers(
-                assemblies,
-                {
-                    language: {
-                        key: occurrences[0].raw_value
-                        for key, occurrences in indexed.items()
-                    }
-                    for language, indexed in entries_by_language.items()
-                },
-            )
-            for diagnostic in assemblies.diagnostics:
-                language = next(
-                    (entry.language for entry in flat_entries
-                     if entry.path == diagnostic.path and entry.key == diagnostic.key),
-                    "l_russian",
-                )
-                assembly_errors.append(_parse_issue(diagnostic, language))
-        missing_ru = (
-            english_keys - russian_keys - assembly_ignored.get("l_english", set())
-        )
-        missing_en = (
-            russian_keys - english_keys - assembly_ignored.get("l_russian", set())
-        )
 
         issues: list[ComparisonIssue] = []
         for key in sorted(
-            missing_ru,
+            english_keys - russian_keys,
             key=str.casefold,
         ):
             issues.append(
@@ -575,7 +541,7 @@ class LocalisationComparator:
                 )
             )
         for key in sorted(
-            missing_en,
+            russian_keys - english_keys,
             key=str.casefold,
         ):
             issues.append(
@@ -609,7 +575,6 @@ class LocalisationComparator:
             for issue in parse_issues
         }
         issues.extend(unique_parse_issues.values())
-        issues.extend(assembly_errors)
         english_to_russian = _counterpart_files(
             english_files,
             resolved_english,
@@ -644,16 +609,12 @@ class LocalisationComparator:
             english_keys=len(english_keys),
             russian_keys=len(russian_keys),
             common_keys=len(english_keys & russian_keys),
-            missing_russian=len(missing_ru),
-            missing_english=len(missing_en),
+            missing_russian=len(english_keys - russian_keys),
+            missing_english=len(russian_keys - english_keys),
             duplicate_english=duplicate_english,
             duplicate_russian=duplicate_russian,
-            parse_errors=len(unique_parse_issues) + len(assembly_errors),
+            parse_errors=len(unique_parse_issues),
             issues=issues,
             english_files_excluded=english_files_excluded,
             russian_files_excluded=russian_files_excluded,
-            assembly_helpers_omitted=(
-                len(english_keys - russian_keys) - len(missing_ru)
-                + len(russian_keys - english_keys) - len(missing_en)
-            ),
         )

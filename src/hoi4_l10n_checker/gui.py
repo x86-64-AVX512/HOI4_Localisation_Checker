@@ -33,7 +33,6 @@ from .gui_compare_tab import ComparisonTab
 from .gui_editor import NotepadPlusPlusController
 from .gui_exceptions import CharacterExceptionsController
 from .gui_layout_tab import TextLayoutTab
-from .gui_long_text_tab import LongTextTab
 from .localisation_compare import (
     ComparisonLanguage,
     LocalisationComparator,
@@ -156,7 +155,6 @@ class CheckerApplication:
         self._refresh_context_mod_ui()
         self._build_layout_tab()
         self._build_compare_tab()
-        self.long_text_tab = LongTextTab(self.root, self.notebook)
         self._refresh_export_controls()
 
     def _build_layout_tab(self) -> None:
@@ -679,7 +677,6 @@ class CheckerApplication:
         self._refresh_layout_controls()
         self._refresh_compare_controls()
         self._refresh_export_controls()
-        self.long_text_tab.set_busy(busy)
 
     def _refresh_export_controls(self) -> None:
         self.check_tab.refresh_export_control()
@@ -703,7 +700,6 @@ class CheckerApplication:
         self.compare_tab.prepare_comparison(english_root, russian_root)
         excluded_english = self.compare_tab.excluded_files("english")
         excluded_russian = self.compare_tab.excluded_files("russian")
-        assembly_mod_root = self.compare_tab.assembly_mod_root
 
         def work(reporter: TaskReporter) -> LocalisationComparisonResult:
             return self.localisation_comparator.scan(
@@ -712,7 +708,6 @@ class CheckerApplication:
                 progress=reporter.progress,
                 excluded_english_files=excluded_english,
                 excluded_russian_files=excluded_russian,
-                mod_root=assembly_mod_root,
             )
 
         if self.tasks.start("comparison", work):
