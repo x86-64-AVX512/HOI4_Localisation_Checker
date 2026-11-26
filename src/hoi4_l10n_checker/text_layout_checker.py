@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Callable, Literal, Protocol
 
@@ -23,8 +23,10 @@ from .font_context import (
     RoleEvidence,
     build_font_context,
 )
+from .long_text import _event_description_keys, collect_entries
 from .models import Diagnostic, LocalisationEntry
 from .parser import iter_rendered_characters, parse_localisation_file
+from .scripted_assemblies import analyse_assemblies
 
 FocusCheckMode = Literal["length", "newline", "exact"]
 FocusPreviewPriorityMode = Literal["auto_ru", "auto_en", "ru", "en"]
@@ -546,6 +548,30 @@ class TextLayoutChecker:
         titles_checked = 0
         diagnostics: list[Diagnostic] = []
         exact_candidates: list[_ExactFocusCandidate] = []
+        assembled_variants = {}
+        assembled_helpers: set[tuple[str, str]] = set()
+        direct_event_keys: set[str] = set()
+        if options.events_enabled or options.welcome_enabled:
+            source_paths = {entry.path.resolve() for entry in entries}
+            assembly_entries = entries + [
+                entry for entry in collect_entries(mod_root)
+                if entry.path.resolve() not in source_paths
+            ]
+            assemblies = analyse_assemblies(mod_root, assembly_entries)
+            assembled_variants = assemblies.variants
+            direct_event_keys = _event_description_keys(mod_root)
+            assembled_helpers = {
+                (language, helper)
+                for (language, _key), variants in assemblies.variants.items()
+                for variant in variants for helper in variant.helpers
+            }
+            checked_keys = {(entry.language, entry.key) for entry in entries}
+            diagnostics.extend(
+                diagnostic for diagnostic in assemblies.diagnostics
+                if any(
+                    diagnostic.key == key for _language, key in checked_keys
+                )
+            )
 
         for entry in entries:
             roles = context.roles_for_key(entry.key)
@@ -589,22 +615,34 @@ class TextLayoutChecker:
                         )
                     )
 
-            if options.events_enabled and ROLE_EVENT_DESCRIPTION in roles:
-                events_checked += 1
+            assembly_helper = (
+                (entry.language, entry.key) in assembled_helpers
+                and entry.key not in direct_event_keys
+                and entry.key != "EAW_WS_TAB_1_TXT"
+            )
+            if (
+                options.events_enabled and ROLE_EVENT_DESCRIPTION in roles
+                and not assembly_helper
+            ):
                 confidence, evidence = _role_explanation(
                     context,
                     entry.key,
                     ROLE_EVENT_DESCRIPTION,
                 )
-                diagnostic = _length_diagnostic(
-                    entry,
-                    "Ивент",
-                    options.event_limit,
-                    confidence,
-                    evidence,
+                variants = assembled_variants.get((entry.language, entry.key))
+                measured = (
+                    [(variant.label, replace(entry, raw_value=variant.raw_value))
+                     for variant in variants]
+                    if variants else [("", entry)]
                 )
-                if diagnostic is not None:
-                    diagnostics.append(diagnostic)
+                for label, rendered_entry in measured:
+                    events_checked += 1
+                    diagnostic = _length_diagnostic(
+                        rendered_entry, "Ивент", options.event_limit,
+                        confidence, evidence + (f" Сборка: {label}." if label else ""),
+                    )
+                    if diagnostic is not None:
+                        diagnostics.append(diagnostic)
 
             if options.title_newline_enabled:
                 title_roles = (
@@ -635,22 +673,30 @@ class TextLayoutChecker:
                     if diagnostic is not None:
                         diagnostics.append(diagnostic)
 
-            if options.welcome_enabled and ROLE_WELCOME_TEXT in roles:
-                welcome_checked += 1
+            if (
+                options.welcome_enabled and ROLE_WELCOME_TEXT in roles
+                and not assembly_helper
+            ):
                 confidence, evidence = _role_explanation(
                     context,
                     entry.key,
                     ROLE_WELCOME_TEXT,
                 )
-                diagnostic = _length_diagnostic(
-                    entry,
-                    "Вступительный экран",
-                    options.welcome_limit,
-                    confidence,
-                    evidence,
+                variants = assembled_variants.get((entry.language, entry.key))
+                measured = (
+                    [(variant.label, replace(entry, raw_value=variant.raw_value))
+                     for variant in variants]
+                    if variants else [("", entry)]
                 )
-                if diagnostic is not None:
-                    diagnostics.append(diagnostic)
+                for label, rendered_entry in measured:
+                    welcome_checked += 1
+                    diagnostic = _length_diagnostic(
+                        rendered_entry,
+                        "Вступительный экран" + (f" ({label})" if label else ""),
+                        options.welcome_limit, confidence, evidence,
+                    )
+                    if diagnostic is not None:
+                        diagnostics.append(diagnostic)
 
         preview_checked = 0
         preview_green = 0
